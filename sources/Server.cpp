@@ -1,8 +1,8 @@
-#include "Server.hpp"
-#include "Client.hpp"
-#include "Channel.hpp"
-#include "Commands.hpp"
-#include "Utils.hpp"
+#include "../includes/Server.hpp"
+#include "../includes/Client.hpp"
+#include "../includes/Channel.hpp"
+#include "../includes/Commands.hpp"
+#include "../includes/Utils.hpp"
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstring>
@@ -11,9 +11,9 @@
 #include <netdb.h>
 
 Server::Server(const std::string& port, const std::string& password)
-    : _port(port),
+    : _serverSocket(-1),
+      _port(port),
       _password(password),
-      _serverSocket(-1),
       _running(false) {
 
     _hostname = "localhost";
@@ -235,7 +235,8 @@ void Server::acceptNewConnection() {
 
     setNonBlocking(clientFd);
 
-    Client* client = new Client(clientFd, "unknown", this);
+    // Client* client = new Client(clientFd, "unknown", this);
+    Client* client = new Client(clientFd, "unknown");
     addClient(client);
 }
 

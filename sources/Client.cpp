@@ -1,15 +1,17 @@
-#include "Client.hpp"
-#include "Server.hpp"
-#include <unistd.h>
-#include <cstring>
+#include "../includes/Client.hpp"
+#include "../includes/Server.hpp"
 
-Client::Client(int fd, const std::string& hostname, Server* server)
+
+// Client::Client(int fd, const std::string& hostname, Server* server)
+Client::Client(int fd, const std::string& hostname)
     : _fd(fd),
       _hostname(hostname),
       _isRegistered(false),
       _isOperator(false),
-      _isAuthenticated(false),
-      _server(server) {
+    //   _isAuthenticated(false),
+    //   _server(server) {
+
+      _isAuthenticated(false) {
     char host[NI_MAXHOST];
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
@@ -18,6 +20,7 @@ Client::Client(int fd, const std::string& hostname, Server* server)
         getnameinfo((struct sockaddr*)&addr, addr_len, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
         _hostname = host;
     }
+    // (void)server; // To avoid unused parameter warning if _server is not used
 }
 
 Client::~Client() {

@@ -1,4 +1,4 @@
-#include "Message.hpp"
+#include "../includes/Message.hpp"
 #include <algorithm>
 
 Message::Message(const std::string& raw) : _raw(raw), _complete(true) {

@@ -1,8 +1,14 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
+#include "Server.hpp"
 #include <string>
 #include <deque>
+
+#include <unistd.h>
+#include <cstring>
+
+#include <netdb.h>
 
 class Server;
 
@@ -18,10 +24,11 @@ private:
     bool _isRegistered;
     bool _isOperator;
     bool _isAuthenticated;
-    Server* _server;
+    // Server* _server;
 
 public:
-    Client(int fd, const std::string& hostname, Server* server);
+    // Client(int fd, const std::string& hostname, Server* server);
+    Client(int fd, const std::string& hostname);
     ~Client();
 
     // Getters

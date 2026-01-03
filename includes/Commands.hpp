@@ -1,6 +1,10 @@
 #ifndef COMMANDS_HPP
 #define COMMANDS_HPP
 
+#include "Server.hpp"
+#include "Client.hpp"
+#include "Message.hpp"
+
 class Server;
 class Client;
 class Message;

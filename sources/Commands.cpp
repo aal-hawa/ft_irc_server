@@ -1,8 +1,8 @@
-#include "Commands.hpp"
-#include "Server.hpp"
-#include "Client.hpp"
-#include "Message.hpp"
-#include "Utils.hpp"
+#include "../includes/Commands.hpp"
+#include "../includes/Server.hpp"
+#include "../includes/Client.hpp"
+#include "../includes/Message.hpp"
+#include "../includes/Utils.hpp"
 #include <sstream>
 
 // PASS Command
