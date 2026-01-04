@@ -7,7 +7,7 @@
 
 // PASS Command
 void Command_PASS(Server* server, Client* client, const Message& message) {
-    (void)server; // Unused parameter
+    // (void)server; // Unused parameter
 
     std::vector<std::string> params = message.getParams();
 
