@@ -1,7 +1,7 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include "Server.hpp"
+// #include "Server.hpp"
 #include <string>
 #include <deque>
 
@@ -10,7 +10,7 @@
 
 #include <netdb.h>
 
-class Server;
+// class Server;
 
 class Client {
 private:

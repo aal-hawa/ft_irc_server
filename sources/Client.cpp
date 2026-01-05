@@ -1,5 +1,5 @@
 #include "../includes/Client.hpp"
-#include "../includes/Server.hpp"
+// #include "../includes/Server.hpp"
 
 
 // Client::Client(int fd, const std::string& hostname, Server* server)
