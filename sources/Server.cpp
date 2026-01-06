@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <iostream>
 
 Server::Server(const std::string& port, const std::string& password)
     : _serverSocket(-1),
@@ -222,6 +223,7 @@ void Server::listenForConnections() {
 }
 
 void Server::acceptNewConnection() {
+    std::cout << "acceptNewConnection" <<  std::endl;
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
 
@@ -264,6 +266,8 @@ void Server::runPollLoop() {
 }
 
 void Server::handleClientData(int clientFd) {
+    std::cout << "handleClientData" <<  std::endl;
+
     char buffer[1024];
     ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
 
@@ -279,6 +283,8 @@ void Server::handleClientData(int clientFd) {
         client->appendRecvBuffer(buffer);
 
         while (client->hasCompleteMessage()) {
+         std::cout << "hasCompleteMessage" <<  std::endl;
+
             std::string messageStr = client->getNextMessage();
             if (!messageStr.empty()) {
                 processCommand(client, messageStr);
@@ -288,6 +294,8 @@ void Server::handleClientData(int clientFd) {
 }
 
 void Server::handleClientDisconnect(int clientFd) {
+    std::cout << "handleClientDisconnect" <<  std::endl;
+
     Client* client = getClientByFd(clientFd);
     if (client) {
         Command_QUIT(this, client, Message("QUIT :Client disconnected"));
@@ -295,13 +303,19 @@ void Server::handleClientDisconnect(int clientFd) {
 }
 
 void Server::processCommand(Client* client, const std::string& messageStr) {
+         std::cout << "processCommand" <<  std::endl;
+         std::cout << "messageStr: " << messageStr <<  std::endl;
+
     Message message(messageStr);
 
     if (!message.isComplete()) {
+        std::cout << "isComplete: " << "false" <<  std::endl;
+
         return;
     }
 
     std::string command = Utils::toUpper(message.getCommand());
+    std::cout << "command: " << command <<  std::endl;
 
     if (command == "PASS") {
         Command_PASS(this, client, message);

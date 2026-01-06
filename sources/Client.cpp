@@ -111,7 +111,7 @@ bool Client::hasCompleteMessage() const {
 std::string Client::getNextMessage() {
     size_t pos = _recvBuffer.find("\r\n");
     if (pos != std::string::npos) {
-        std::string message = _recvBuffer.substr(0, pos);
+        std::string message = _recvBuffer.substr(0, pos + 2);
         _recvBuffer = _recvBuffer.substr(pos + 2);
         return message;
     }

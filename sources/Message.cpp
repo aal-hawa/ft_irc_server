@@ -1,7 +1,22 @@
 #include "../includes/Message.hpp"
 #include <algorithm>
+#include <iostream>
+
+void debugPrint(const std::string& data) {
+    std::cout << "RAW INPUT: ";
+    for (size_t i = 0; i < data.size(); ++i) {
+        if (data[i] == '\r')
+            std::cout << "\\r";
+        else if (data[i] == '\n')
+            std::cout << "\\n";
+        else
+            std::cout << data[i];
+    }
+    std::cout << std::endl;
+}
 
 Message::Message(const std::string& raw) : _raw(raw), _complete(true) {
+    debugPrint(raw);
     if (_raw.find("\r\n") == std::string::npos) {
         _complete = false;
     } else {
