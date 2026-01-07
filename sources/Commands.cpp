@@ -260,7 +260,7 @@ void Command_QUIT(Server* server, Client* client, const Message& message) {
 
     // Remove from server
     server->removeClient(client->getFd());
-    delete client;
+    // delete client;
 }
 
 // KICK Command
