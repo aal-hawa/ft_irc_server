@@ -61,10 +61,7 @@ bool Utils::isValidChannelName(const std::string& channel) {
 
     // Rest can be any printable character except space, comma, or control chars
     for (size_t i = 1; i < channel.length(); ++i) {
-        if (channel[i] == ' ' || channel[i] == ',' || channel[i] == 7) {
-            return false;
-        }
-        if (channel[i] < 1 || channel[i] > 31 || channel[i] == 127) {
+        if (channel[i] <= 32  || channel[i] == ',' || channel[i] == 127) {
             return false;
         }
     }
