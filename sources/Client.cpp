@@ -1,16 +1,10 @@
 #include "../includes/Client.hpp"
-// #include "../includes/Server.hpp"
 
-
-// Client::Client(int fd, const std::string& hostname, Server* server)
 Client::Client(int fd, const std::string& hostname)
     : _fd(fd),
       _hostname(hostname),
       _isRegistered(false),
       _isOperator(false),
-    //   _isAuthenticated(false),
-    //   _server(server) {
-
       _isAuthenticated(false) {
     char host[NI_MAXHOST];
     struct sockaddr_in addr;
@@ -20,7 +14,6 @@ Client::Client(int fd, const std::string& hostname)
         getnameinfo((struct sockaddr*)&addr, addr_len, host, sizeof(host), NULL, 0, NI_NUMERICHOST);
         _hostname = host;
     }
-    // (void)server; // To avoid unused parameter warning if _server is not used
 }
 
 Client::~Client() {
@@ -91,29 +84,71 @@ void Client::setAuthenticated(bool auth) {
     _isAuthenticated = auth;
 }
 
+// FIXED: Buffer messages instead of sending directly
+// This allows poll() to monitor POLLOUT before sending
 void Client::sendToClient(const std::string& message) {
     std::string fullMessage = message + "\r\n";
-    ssize_t sent = send(_fd, fullMessage.c_str(), fullMessage.length(), 0);
+    _sendBuffer.push_back(fullMessage);
+}
 
-    if (sent < 0) {
-        // Error sending, connection may be closed
+// FIXED: Support both \r\n (telnet) and \n (nc)
+bool Client::hasCompleteMessage() const {
+    return _recvBuffer.find("\r\n") != std::string::npos ||
+           _recvBuffer.find("\n") != std::string::npos;
+}
+
+// FIXED: Support both \r\n (telnet) and \n (nc)
+std::string Client::getNextMessage() {
+    size_t pos = _recvBuffer.find("\r\n");
+    size_t lineLen = 2;  // Length of \r\n
+
+    // If no \r\n, check for just \n (for nc compatibility)
+    if (pos == std::string::npos) {
+        pos = _recvBuffer.find("\n");
+        lineLen = 1;  // Length of \n
     }
+
+    if (pos != std::string::npos) {
+        std::string message = _recvBuffer.substr(0, pos + lineLen);
+        _recvBuffer = _recvBuffer.substr(pos + lineLen);
+        return message;
+    }
+    return "";
 }
 
 void Client::appendRecvBuffer(const std::string& data) {
     _recvBuffer += data;
 }
 
-bool Client::hasCompleteMessage() const {
-    return _recvBuffer.find("\r\n") != std::string::npos;
+// Check if there's data waiting to be sent
+bool Client::hasPendingData() const {
+    return !_sendBuffer.empty();
 }
 
-std::string Client::getNextMessage() {
-    size_t pos = _recvBuffer.find("\r\n");
-    if (pos != std::string::npos) {
-        std::string message = _recvBuffer.substr(0, pos + 2);
-        _recvBuffer = _recvBuffer.substr(pos + 2);
-        return message;
+// FIXED: Only call send() when poll() indicates POLLOUT is ready
+void Client::flushSendBuffer() {
+    while (!_sendBuffer.empty()) {
+        const std::string& msg = _sendBuffer.front();
+        ssize_t sent = send(_fd, msg.c_str(), msg.length(), MSG_NOSIGNAL);
+
+        if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Socket not ready for writing, keep data in buffer
+                // poll() will notify us when POLLOUT is ready
+                return;
+            }
+            // Error occurred, remove the message to avoid infinite loop
+            _sendBuffer.pop_front();
+            return;
+        }
+
+        if (static_cast<size_t>(sent) < msg.length()) {
+            // Partial send, keep remainder in buffer
+            _sendBuffer.front() = msg.substr(sent);
+            return;
+        }
+
+        // Full message sent, remove from buffer
+        _sendBuffer.pop_front();
     }
-    return "";
 }

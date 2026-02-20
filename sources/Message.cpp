@@ -15,16 +15,28 @@ void debugPrint(const std::string& data) {
     std::cout << std::endl;
 }
 
+// FIXED: Support both \r\n (telnet) and \n (nc)
 Message::Message(const std::string& raw) : _raw(raw), _complete(true) {
     debugPrint(raw);
-    if (_raw.find("\r\n") == std::string::npos) {
-        _complete = false;
-    } else {
-        // Remove \r\n from the end
-        size_t crlfPos = _raw.find("\r\n");
+
+    // Check for \r\n first (standard IRC)
+    size_t crlfPos = _raw.find("\r\n");
+    if (crlfPos != std::string::npos) {
         _raw = _raw.substr(0, crlfPos);
         parse();
+        return;
     }
+
+    // If no \r\n, check for just \n (nc compatibility)
+    size_t lfPos = _raw.find("\n");
+    if (lfPos != std::string::npos) {
+        _raw = _raw.substr(0, lfPos);
+        parse();
+        return;
+    }
+
+    // No complete message found
+    _complete = false;
 }
 
 void Message::parse() {

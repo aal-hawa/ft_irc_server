@@ -7,8 +7,6 @@
 
 // PASS Command
 void Command_PASS(Server* server, Client* client, const Message& message) {
-    // (void)server; // Unused parameter
-
     std::vector<std::string> params = message.getParams();
 
     if (params.empty()) {
@@ -111,9 +109,11 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         }
 
         Channel* channel = server->getChannel(channelName);
+        bool isNewChannel = false;
         if (!channel) {
             channel = new Channel(channelName, client);
             server->addChannel(channel);
+            isNewChannel = true;
         } else {
             // Check if invite-only
             if (channel->isInviteOnly() && !channel->isInvited(client->getNickname())) {
@@ -135,7 +135,8 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         }
 
         channel->addMember(client);
-        if (channel->getMemberCount() == 1) {
+        // First user becomes operator
+        if (isNewChannel || channel->getMemberCount() == 1) {
             channel->addOperator(client);
         }
 
@@ -260,7 +261,6 @@ void Command_QUIT(Server* server, Client* client, const Message& message) {
 
     // Remove from server
     server->removeClient(client->getFd());
-    // delete client;
 }
 
 // KICK Command
@@ -347,7 +347,7 @@ void Command_INVITE(Server* server, Client* client, const Message& message) {
     targetClient->sendToClient(":" + client->getPrefix() + " INVITE " + nickname + " :" + channelName);
 }
 
-// TOPIC Command
+// TOPIC Command - FIXED: Use client prefix instead of server hostname
 void Command_TOPIC(Server* server, Client* client, const Message& message) {
     std::vector<std::string> params = message.getParams();
 
@@ -387,7 +387,8 @@ void Command_TOPIC(Server* server, Client* client, const Message& message) {
 
     std::string newTopic = params[1];
     channel->setTopic(newTopic);
-    server->broadcastToChannel(channel, ":" + server->getHostname() + " TOPIC " + channelName + " :" + newTopic, NULL);
+    // FIXED: Use client prefix instead of server hostname
+    server->broadcastToChannel(channel, ":" + client->getPrefix() + " TOPIC " + channelName + " :" + newTopic, NULL);
 }
 
 // MODE Command
@@ -438,10 +439,10 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                 adding = false;
             } else if (c == 'i') {
                 channel->setInviteOnly(adding);
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "i", NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "i", NULL);
             } else if (c == 't') {
                 channel->setTopicRestricted(adding);
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "t", NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "t", NULL);
             } else if (c == 'k') {
                 if (adding) {
                     if (paramIndex >= params.size()) {
@@ -449,10 +450,11 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                         continue;
                     }
                     channel->setKey(params[paramIndex++]);
+                    server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " +k " + channel->getKey(), NULL);
                 } else {
                     channel->setKey("");
+                    server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " -k", NULL);
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "k", NULL);
             } else if (c == 'l') {
                 if (adding) {
                     if (paramIndex >= params.size()) {
@@ -461,10 +463,13 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                     }
                     unsigned int limit = Utils::atoi(params[paramIndex++]);
                     channel->setUserLimit(limit);
+                    std::stringstream ss;
+                    ss << limit;
+                    server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " +l " + ss.str(), NULL);
                 } else {
                     channel->setUserLimit(0);
+                    server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " -l", NULL);
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "l", NULL);
             } else if (c == 'o') {
                 if (paramIndex >= params.size()) {
                     client->sendToClient("461 " + target + " MODE :Not enough parameters");
@@ -480,8 +485,36 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                 } else {
                     channel->removeOperator(targetClient);
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
             }
         }
     }
+}
+
+// PING Command - Added for keepalive
+void Command_PING(Server* server, Client* client, const Message& message) {
+    std::vector<std::string> params = message.getParams();
+
+    if (params.empty()) {
+        client->sendToClient("461 * PING :Not enough parameters");
+        return;
+    }
+
+    // Respond with PONG
+    client->sendToClient("PONG " + server->getHostname() + " :" + params[0]);
+}
+
+// PONG Command - Added for keepalive
+void Command_PONG(Server* server, Client* client, const Message& message) {
+    std::vector<std::string> params = message.getParams();
+
+    if (params.empty()) {
+        client->sendToClient("461 * PONG :Not enough parameters");
+        return;
+    }
+
+    // PONG is typically used as a response to PING
+    // Most servers just acknowledge it silently
+    (void)server;
+    (void)client;
 }
