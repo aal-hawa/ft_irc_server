@@ -25,6 +25,7 @@ int main(int argc, char* argv[]) {
     // Set up signal handler
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
+    signal(SIGPIPE, SIG_IGN);
 
     try {
         Server server(port, password);

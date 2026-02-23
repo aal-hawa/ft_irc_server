@@ -154,10 +154,10 @@ void Server::broadcastToChannel(Channel* channel, const std::string& message, Cl
 }
 
 void Server::sendWelcome(Client* client) {
-    client->sendToClient("001 " + client->getNickname() + " :Welcome to the Internet Relay Network " + client->getPrefix());
-    client->sendToClient("002 " + client->getNickname() + " :Your host is " + _hostname + ", running version ft_irc");
-    client->sendToClient("003 " + client->getNickname() + " :This server was created " + _creationTime);
-    client->sendToClient("004 " + client->getNickname() + " " + _hostname + " ft_irc i o");
+    client->sendToClient(":" + _hostname + " 001 " + client->getNickname() + " :Welcome to the Internet Relay Network " + client->getPrefix());
+    client->sendToClient(":" + _hostname + " 002 " + client->getNickname() + " :Your host is " + _hostname + ", running version ft_irc");
+    client->sendToClient(":" + _hostname + " 003 " + client->getNickname() + " :This server was created " + _creationTime);
+    client->sendToClient(":" + _hostname + " 004 " + client->getNickname() + " " + _hostname + " ft_irc i o");
 }
 
 void Server::sendNames(Client* client, Channel* channel) {
@@ -223,6 +223,7 @@ void Server::listenForConnections() {
 }
 
 void Server::acceptNewConnection() {
+    std::cout << "acceptNewConnection" <<  std::endl;
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
 
@@ -236,31 +237,69 @@ void Server::acceptNewConnection() {
 
     setNonBlocking(clientFd);
 
+    // Client* client = new Client(clientFd, "unknown", this);
     Client* client = new Client(clientFd, "unknown");
     addClient(client);
-
-    std::cout << "New client connected on fd " << clientFd << std::endl;
 }
 
-// FIXED: Update poll loop to monitor POLLOUT for buffered sending
-void Server::runPollLoop() {
-    while (_running) {
-        // Update pollfd events for each client based on pending data
-        for (size_t i = 0; i < _pollFds.size(); ++i) {
-            if (_pollFds[i].fd == _serverSocket) {
-                // Server socket only needs POLLIN
-                _pollFds[i].events = POLLIN;
-            } else {
-                // Check if client has pending data to send
-                Client* client = getClientByFd(_pollFds[i].fd);
-                if (client && client->hasPendingData()) {
-                    // Monitor both POLLIN and POLLOUT when we have data to send
-                    _pollFds[i].events = POLLIN | POLLOUT;
-                } else {
-                    // Only monitor POLLIN when no data to send
-                    _pollFds[i].events = POLLIN;
-                }
+
+void Server::flushClientOutput(int clientFd)
+{
+    Client* client = getClientByFd(clientFd);
+    if (!client) return;
+
+    while (client->hasPendingOutput())
+    {
+        std::string& msg = client->frontSendBuffer();
+
+        ssize_t sent = send(clientFd, msg.c_str(), msg.size(), 0);
+
+        if (sent < 0)
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                //Not ready to wring, waiting for poll()
+                return;
             }
+            handleClientDisconnect(clientFd);
+            return;
+        }
+
+        if (sent == 0)
+        {
+            // Treat as disconnect
+            handleClientDisconnect(clientFd);
+            return;
+        }
+        if ((size_t) sent < msg.size())
+        {
+            // Partial send: remove sent part, keep the rest for later
+            msg.erase(0, sent);
+            return;
+        }
+        client-> popFrontSendBuffer();
+    }
+
+}
+
+
+
+void Server::runPollLoop() {
+    while (_running)
+    {
+        for (size_t i = 0; i < _pollFds.size(); ++i)
+        {
+            if (_pollFds[i].fd == _serverSocket)
+            {
+                _pollFds[i].events = POLLIN;
+                continue;
+            }
+            Client* c = getClientByFd(_pollFds[i].fd);
+            if (!c) continue;
+
+            _pollFds[i].events = POLLIN;
+            if (c->hasPendingOutput())
+                _pollFds[i].events |= POLLOUT;
         }
 
         int pollResult = poll(&_pollFds[0], _pollFds.size(), -1);
@@ -272,39 +311,52 @@ void Server::runPollLoop() {
             break;
         }
 
-        for (size_t i = 0; i < _pollFds.size(); ++i) {
-            // Handle read events (POLLIN)
-            if (_pollFds[i].revents & POLLIN) {
-                if (_pollFds[i].fd == _serverSocket) {
+        for (size_t i = 0; i < _pollFds.size(); ++i)
+        {
+            short re = _pollFds[i].revents;
+            int fd = _pollFds[i].fd;
+
+            //  broken/disconnected socket
+            if(re & (POLLHUP | POLLERR | POLLNVAL))
+            {
+                if (fd != _serverSocket)
+                    handleClientDisconnect(fd);
+                continue;
+            }
+
+            //  readable
+            if (re & POLLIN)
+            {
+                if(fd == _serverSocket)
                     acceptNewConnection();
-                } else {
-                    handleClientData(_pollFds[i].fd);
-                }
+                else
+                    handleClientData(fd);
             }
 
-            // FIXED: Handle write events (POLLOUT) - only send when poll() says ready!
-            if (_pollFds[i].revents & POLLOUT) {
-                Client* client = getClientByFd(_pollFds[i].fd);
-                if (client) {
-                    client->flushSendBuffer();  // Only call send() when POLLOUT is ready!
-                }
-            }
-
-            // Handle errors/disconnects
-            if (_pollFds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-                if (_pollFds[i].fd != _serverSocket) {
-                    handleClientDisconnect(_pollFds[i].fd);
-                }
+            //  Writable (send queued output)
+            if (re & POLLOUT)
+            {
+                flushClientOutput(fd);
             }
         }
     }
 }
 
 void Server::handleClientData(int clientFd) {
+    std::cout << "handleClientData" <<  std::endl;
+
     char buffer[1024];
     ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
 
-    if (bytesRead <= 0) {
+    if (bytesRead < 0)
+    {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return;
+        handleClientDisconnect(clientFd);
+        return;
+    }
+    if (bytesRead == 0)
+    {
         handleClientDisconnect(clientFd);
         return;
     }
@@ -316,6 +368,8 @@ void Server::handleClientData(int clientFd) {
         client->appendRecvBuffer(buffer);
 
         while (client->hasCompleteMessage()) {
+         std::cout << "hasCompleteMessage" <<  std::endl;
+
             std::string messageStr = client->getNextMessage();
             if (!messageStr.empty()) {
                 processCommand(client, messageStr);
@@ -325,24 +379,35 @@ void Server::handleClientData(int clientFd) {
 }
 
 void Server::handleClientDisconnect(int clientFd) {
+    std::cout << "handleClientDisconnect" <<  std::endl;
+
     Client* client = getClientByFd(clientFd);
     if (client) {
-        std::cout << "Client " << client->getNickname() << " disconnected" << std::endl;
         Command_QUIT(this, client, Message("QUIT :Client disconnected"));
     }
 }
 
 void Server::processCommand(Client* client, const std::string& messageStr) {
+         std::cout << "processCommand" <<  std::endl;
+         std::cout << "messageStr: " << messageStr <<  std::endl;
+
     Message message(messageStr);
 
     if (!message.isComplete()) {
+        std::cout << "isComplete: " << "false" <<  std::endl;
+
         return;
     }
 
     std::string command = Utils::toUpper(message.getCommand());
+    std::cout << "command: " << command <<  std::endl;
 
     if (command == "PASS") {
         Command_PASS(this, client, message);
+    } else if (command == "CAP") {
+        Command_CAP(this, client, message);
+    } else if (command == "PING") {
+        Command_PING(this, client, message);
     } else if (command == "NICK") {
         Command_NICK(this, client, message);
     } else if (command == "USER") {
@@ -363,11 +428,7 @@ void Server::processCommand(Client* client, const std::string& messageStr) {
         Command_TOPIC(this, client, message);
     } else if (command == "MODE") {
         Command_MODE(this, client, message);
-    } else if (command == "PING") {
-        Command_PING(this, client, message);
-    } else if (command == "PONG") {
-        Command_PONG(this, client, message);
     } else {
-        client->sendToClient("421 " + client->getNickname() + " " + command + " :Unknown command");
+        client->sendToClient("421 " + command + " :Unknown command");
     }
 }

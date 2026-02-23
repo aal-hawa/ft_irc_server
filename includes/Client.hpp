@@ -1,14 +1,16 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
+// #include "Server.hpp"
 #include <string>
 #include <deque>
 
 #include <unistd.h>
 #include <cstring>
-#include <errno.h>
 
 #include <netdb.h>
+
+// class Server;
 
 class Client {
 private:
@@ -22,8 +24,10 @@ private:
     bool _isRegistered;
     bool _isOperator;
     bool _isAuthenticated;
+    // Server* _server;
 
 public:
+    // Client(int fd, const std::string& hostname, Server* server);
     Client(int fd, const std::string& hostname);
     ~Client();
 
@@ -51,10 +55,10 @@ public:
     void appendRecvBuffer(const std::string& data);
     bool hasCompleteMessage() const;
     std::string getNextMessage();
-
-    // Buffered sending with poll() support
-    bool hasPendingData() const;
-    void flushSendBuffer();
+    //output queue helpers 
+    bool hasPendingOutput() const;
+    std::string& frontSendBuffer();
+    void popFrontSendBuffer();
 };
 
 #endif

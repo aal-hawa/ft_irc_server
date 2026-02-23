@@ -58,6 +58,9 @@ public:
     void sendWelcome(Client* client);
     void sendNames(Client* client, Channel* channel);
 
+    // output Queue handling
+    void flushClientOutput(int clientFd);
+
 private:
     void createSocket();
     void setNonBlocking(int fd);
