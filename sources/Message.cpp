@@ -59,15 +59,19 @@ void Message::extractPrefix() {
 
 void Message::extractCommandAndParams()
 {
-    if (_raw.empty())
-    {
+    if (_raw.empty()) {
         return;
     }
 
-    // Extract command
+    while (!_raw.empty() && _raw[0] == ' ') {
+        _raw.erase(0, 1);
+    }
+    if (_raw.empty()) {
+        return;
+    }
+
     size_t spacePos = _raw.find(' ');
-    if (spacePos != std::string::npos)
-    {
+    if (spacePos != std::string::npos) {
         _command = _raw.substr(0, spacePos);
         _raw = _raw.substr(spacePos + 1);
     } else {
@@ -76,10 +80,15 @@ void Message::extractCommandAndParams()
         return;
     }
 
-    // Extract params
     while (!_raw.empty()) {
+        while (!_raw.empty() && _raw[0] == ' ') {
+            _raw.erase(0, 1);
+        }
+        if (_raw.empty()) {
+            break;
+        }
+
         if (_raw[0] == ':') {
-            // Trailing parameter
             _trailing = _raw.substr(1);
             _params.push_back(_trailing);
             break;
@@ -88,7 +97,9 @@ void Message::extractCommandAndParams()
         spacePos = _raw.find(' ');
         if (spacePos != std::string::npos) {
             std::string param = _raw.substr(0, spacePos);
-            _params.push_back(param);
+            if (!param.empty()) {
+                _params.push_back(param);
+            }
             _raw = _raw.substr(spacePos + 1);
         } else {
             if (!_raw.empty()) {

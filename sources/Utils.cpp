@@ -2,6 +2,7 @@
 #include <ctime>
 #include <algorithm>
 #include <cctype>
+#include <climits>
 
 bool Utils::isValidPassword(const std::string& password) {
     return !password.empty();
@@ -103,12 +104,22 @@ void Utils::trim(std::string& str) {
     }
 }
 
-int Utils::atoi(const std::string& str) {
+int Utils::atoi(const std::string& str)
+{
     std::stringstream ss(str);
-    int result;
-    ss >> result;
-    return result;
+    long result = 0;
+    char extra;
+
+    if (!(ss >> result) || (ss >> extra)) {
+        return 0;
+    }
+    if (result < INT_MIN || result > INT_MAX) {
+        return 0;
+    }
+    return static_cast<int>(result);
 }
+
+
 bool Utils::isPositiveNumber(const std::string& str)
 {
     if (str.empty())

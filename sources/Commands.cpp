@@ -131,6 +131,11 @@ void Command_USER(Server* server, Client* client, const Message& message) {
         return;
     }
 
+    if (!Utils::isValidUsername(params[0])) {
+        client->sendToClient(":" + server->getHostname() + " 461 * USER :Invalid username");
+        return;
+    }
+
     client->setUsername(params[0]);
     client->setRealname(params[3]);
 
@@ -138,7 +143,8 @@ void Command_USER(Server* server, Client* client, const Message& message) {
 }
 
 // JOIN Command
-void Command_JOIN(Server* server, Client* client, const Message& message) {
+void Command_JOIN(Server* server, Client* client, const Message& message)
+{
     std::vector<std::string> params = message.getParams();
 
     if (params.empty()) {
@@ -152,8 +158,7 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         keys = Utils::split(params[1], ',');
     }
 
-    for (size_t i = 0; i < channels.size(); ++i)
-    {
+    for (size_t i = 0; i < channels.size(); ++i) {
         std::string channelName = channels[i];
         std::string key = (i < keys.size()) ? keys[i] : "";
 
@@ -167,19 +172,20 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
             channel = new Channel(channelName, client);
             server->addChannel(channel);
         } else {
-            // Check if invite-only
+            if (channel->isMember(client)) {
+                continue;
+            }
+
             if (channel->isInviteOnly() && !channel->isInvited(client->getNickname())) {
                 client->sendToClient("473 " + channelName + " :Cannot join channel (+i)");
                 continue;
             }
 
-            // Check key
             if (!channel->getKey().empty() && channel->getKey() != key) {
                 client->sendToClient("475 " + channelName + " :Cannot join channel (+k)");
                 continue;
             }
 
-            // Check user limit
             if (channel->getUserLimit() > 0 && channel->getMemberCount() >= channel->getUserLimit()) {
                 client->sendToClient("471 " + channelName + " :Cannot join channel (+l)");
                 continue;
@@ -189,23 +195,17 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         channel->addMember(client);
         channel->uninviteUser(client->getNickname());
 
-        if (channel->getMemberCount() == 1)
-        {
+        if (channel->getMemberCount() == 1) {
             channel->addOperator(client);
         }
 
         client->sendToClient(":" + client->getPrefix() + " JOIN :" + channelName);
 
-        // Send topic
-        if (!channel->getTopic().empty())
-        {
-            client->sendToClient("332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
+        if (!channel->getTopic().empty()) {
+            client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
         }
 
-        // Send names list
         server->sendNames(client, channel);
-
-        // Broadcast join to channel
         server->broadcastToChannel(channel, ":" + client->getPrefix() + " JOIN :" + channelName, client);
     }
 }
@@ -430,17 +430,15 @@ void Command_TOPIC(Server* server, Client* client, const Message& message) {
         return;
     }
 
-    // View topic
     if (params.size() == 1) {
         if (channel->getTopic().empty()) {
-            client->sendToClient("331 " + client->getNickname() + " " + channelName + " :No topic is set");
+            client->sendToClient(":" + server->getHostname() + " 331 " + client->getNickname() + " " + channelName + " :No topic is set");
         } else {
             client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
         }
         return;
     }
 
-    // Set topic
     if (channel->isTopicRestricted() && !channel->isOperator(client)) {
         client->sendToClient("482 " + channelName + " :You're not channel operator");
         return;
@@ -452,7 +450,8 @@ void Command_TOPIC(Server* server, Client* client, const Message& message) {
 }
 
 // MODE Command
-void Command_MODE(Server* server, Client* client, const Message& message) {
+void Command_MODE(Server* server, Client* client, const Message& message)
+{
     std::vector<std::string> params = message.getParams();
 
     if (params.empty()) {
@@ -477,7 +476,7 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
             if (channel->isTopicRestricted()) modes += "t";
             if (!channel->getKey().empty()) modes += "k";
             if (channel->getUserLimit() > 0) modes += "l";
-            client->sendToClient("324 " + client->getNickname() + " " + target + " " + modes);
+            client->sendToClient(":" + server->getHostname() + " 324 " + client->getNickname() + " " + target + " " + modes);
             return;
         }
 
@@ -499,10 +498,10 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                 adding = false;
             } else if (c == 'i') {
                 channel->setInviteOnly(adding);
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "i", NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "i", NULL);
             } else if (c == 't') {
                 channel->setTopicRestricted(adding);
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "t", NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "t", NULL);
             } else if (c == 'k') {
                 if (adding) {
                     if (paramIndex >= params.size()) {
@@ -513,8 +512,7 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                 } else {
                     channel->setKey("");
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "k", NULL);
-            } else if (c == 'l') {
+server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "k", NULL);            } else if (c == 'l') {
                 if (adding) {
                     if (paramIndex >= params.size()) {
                         client->sendToClient("461 " + target + " MODE :Not enough parameters");

@@ -352,8 +352,8 @@ void Server::runPollLoop() {
     }
 }
 
-void Server::handleClientData(int clientFd) {
-    std::cout << "handleClientData" <<  std::endl;
+void Server::handleClientData(int clientFd)
+{
 
     char buffer[1024];
     ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
@@ -377,8 +377,8 @@ void Server::handleClientData(int clientFd) {
     if (client) {
         client->appendRecvBuffer(buffer);
 
-        while (client->hasCompleteMessage()) {
-         std::cout << "hasCompleteMessage" <<  std::endl;
+        while (client->hasCompleteMessage())
+        {
 
             std::string messageStr = client->getNextMessage();
             if (!messageStr.empty()) {
@@ -388,8 +388,8 @@ void Server::handleClientData(int clientFd) {
     }
 }
 
-void Server::handleClientDisconnect(int clientFd) {
-    std::cout << "handleClientDisconnect" <<  std::endl;
+void Server::handleClientDisconnect(int clientFd)
+{
 
     Client* client = getClientByFd(clientFd);
     if (client) {
