@@ -321,34 +321,43 @@ void Server::runPollLoop() {
             break;
         }
 
-        for (size_t i = 0; i < _pollFds.size(); ++i)
+ size_t i = 0;
+    while (i < _pollFds.size())
+    {
+        short re = _pollFds[i].revents;
+        int fd = _pollFds[i].fd;
+
+        // broken/disconnected socket
+        if (re & (POLLHUP | POLLERR | POLLNVAL))
         {
-            short re = _pollFds[i].revents;
-            int fd = _pollFds[i].fd;
+            if (fd != _serverSocket)
+                handleClientDisconnect(fd);
 
-            //  broken/disconnected socket
-            if(re & (POLLHUP | POLLERR | POLLNVAL))
-            {
-                if (fd != _serverSocket)
-                    handleClientDisconnect(fd);
-                continue;
-            }
-
-            //  readable
-            if (re & POLLIN)
-            {
-                if(fd == _serverSocket)
-                    acceptNewConnection();
-                else
-                    handleClientData(fd);
-            }
-
-            //  Writable (send queued output)
-            if (re & POLLOUT)
-            {
-                flushClientOutput(fd);
-            }
+            if (fd == _serverSocket || getClientByFd(fd) != NULL)
+                ++i;
+            continue;
         }
+
+        // readable
+        if (re & POLLIN)
+        {
+            if (fd == _serverSocket)
+                acceptNewConnection();
+            else
+                handleClientData(fd);
+        }
+
+        // if client was removed during read handling, do not use fd again
+        if (fd != _serverSocket && getClientByFd(fd) == NULL)
+            continue;
+
+        // writable
+        if (re & POLLOUT)
+            flushClientOutput(fd);
+
+        if (fd == _serverSocket || getClientByFd(fd) != NULL)
+            ++i;
+    }
     }
 }
 
@@ -384,6 +393,8 @@ void Server::handleClientData(int clientFd)
             if (!messageStr.empty()) {
                 processCommand(client, messageStr);
             }
+            if (getClientByFd(clientFd) == NULL)
+                break;
         }
     }
 }

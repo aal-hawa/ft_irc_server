@@ -1,5 +1,6 @@
-# ft_irc - IRC Server Implementation
+*This project has been created as part of the 42 curriculum by aal-hawa.*
 
+# ft_irc - IRC Server Implementation
 A complete IRC (Internet Relay Chat) server implementation in C++ 98 for the 42 School project.
 
 ---

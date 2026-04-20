@@ -201,8 +201,12 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
 
         client->sendToClient(":" + client->getPrefix() + " JOIN :" + channelName);
 
-        if (!channel->getTopic().empty()) {
-            client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
+       if (!channel->getTopic().empty()) {
+            client->sendToClient(":" + server->getHostname() + " 332 " +
+                client->getNickname() + " " + channelName + " :" + channel->getTopic());
+        } else {
+            client->sendToClient(":" + server->getHostname() + " 331 " +
+                client->getNickname() + " " + channelName + " :No topic is set");
         }
 
         server->sendNames(client, channel);
