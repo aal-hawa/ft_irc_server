@@ -160,7 +160,8 @@ void Server::sendWelcome(Client* client) {
     client->sendToClient(":" + _hostname + " 004 " + client->getNickname() + " " + _hostname + " ft_irc i o");
 }
 
-void Server::sendNames(Client* client, Channel* channel) {
+void Server::sendNames(Client* client, Channel* channel)
+{
     std::string namesList;
     const std::map<int, Client*>& members = channel->getMembers();
 
@@ -172,23 +173,33 @@ void Server::sendNames(Client* client, Channel* channel) {
         namesList += member->getNickname() + " ";
     }
 
-    client->sendToClient("353 " + client->getNickname() + " = " + channel->getName() + " :" + namesList);
-    client->sendToClient("366 " + client->getNickname() + " " + channel->getName() + " :End of /NAMES list");
+    client->sendToClient(":" + _hostname + " 353 " + client->getNickname() + " = " + channel->getName() + " :" + namesList);
+    client->sendToClient(":" + _hostname + " 366 " + client->getNickname() + " " + channel->getName() + " :End of /NAMES list");
 }
 
 void Server::createSocket() {
-    int port = Utils::atoi(_port);
+   if (!Utils::isPositiveNumber(_port))
+   {
+        throw std::runtime_error("Invalid port");
+   }
+   int port = Utils::atoi(_port);
+   if (port <= 0 || port > 65535)
+   {
+        throw std::runtime_error("Invalid port");
+   }
 
-    _serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (_serverSocket == -1) {
-        throw std::runtime_error("Failed to create socket");
-    }
+   _serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+   if (_serverSocket == -1)
+   {
+    throw std::runtime_error("Failed to create socket");
+   }
 
-    int opt = 1;
-    if (setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-        close(_serverSocket);
-        throw std::runtime_error("Failed to set socket options");
-    }
+   int opt = 1;
+   if (setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+   {
+    close(_serverSocket);
+    throw std::runtime_error("Failed to set socket options");
+   }
 
     struct sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
@@ -203,14 +214,13 @@ void Server::createSocket() {
 }
 
 void Server::setNonBlocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        close(_serverSocket);
-        throw std::runtime_error("Failed to get socket flags");
-    }
-
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        close(_serverSocket);
+  if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        if (fd != -1) {
+            close(fd);
+        }
+        if (fd == _serverSocket) {
+            _serverSocket = -1;
+        }
         throw std::runtime_error("Failed to set non-blocking mode");
     }
 }
@@ -223,22 +233,22 @@ void Server::listenForConnections() {
 }
 
 void Server::acceptNewConnection() {
-    std::cout << "acceptNewConnection" <<  std::endl;
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
 
-    int clientFd = accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
-    if (clientFd == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+    int clientFd= accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+    if (clientFd == -1)
+    {
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+        {
             // Error accepting connection
         }
         return;
     }
-
     setNonBlocking(clientFd);
 
-    // Client* client = new Client(clientFd, "unknown", this);
-    Client* client = new Client(clientFd, "unknown");
+    std::string hostname = inet_ntoa(clientAddr.sin_addr);
+    Client* client = new Client(clientFd, hostname);
     addClient(client);
 }
 
@@ -388,19 +398,24 @@ void Server::handleClientDisconnect(int clientFd) {
 }
 
 void Server::processCommand(Client* client, const std::string& messageStr) {
-         std::cout << "processCommand" <<  std::endl;
-         std::cout << "messageStr: " << messageStr <<  std::endl;
-
     Message message(messageStr);
 
     if (!message.isComplete()) {
-        std::cout << "isComplete: " << "false" <<  std::endl;
-
         return;
     }
 
     std::string command = Utils::toUpper(message.getCommand());
-    std::cout << "command: " << command <<  std::endl;
+
+    if (!client->isRegistered() &&
+        command != "CAP" &&
+        command != "PASS" &&
+        command != "NICK" &&
+        command != "USER" &&
+        command != "PING" &&
+        command != "QUIT") {
+        client->sendToClient(":" + _hostname + " 451 * :You have not registered");
+        return;
+    }
 
     if (command == "PASS") {
         Command_PASS(this, client, message);
@@ -429,6 +444,6 @@ void Server::processCommand(Client* client, const std::string& messageStr) {
     } else if (command == "MODE") {
         Command_MODE(this, client, message);
     } else {
-        client->sendToClient("421 " + command + " :Unknown command");
+        client->sendToClient(":" + _hostname + " 421 " + command + " :Unknown command");
     }
 }

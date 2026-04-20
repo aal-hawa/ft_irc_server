@@ -1,25 +1,12 @@
 #include "../includes/Message.hpp"
-#include <algorithm>
-#include <iostream>
 
-void debugPrint(const std::string& data) {
-    std::cout << "RAW INPUT: ";
-    for (size_t i = 0; i < data.size(); ++i) {
-        if (data[i] == '\r')
-            std::cout << "\\r";
-        else if (data[i] == '\n')
-            std::cout << "\\n";
-        else
-            std::cout << data[i];
-    }
-    std::cout << std::endl;
-}
-
-Message::Message(const std::string& raw) : _raw(raw), _complete(true) {
-    debugPrint(raw);
-    if (_raw.find("\r\n") == std::string::npos) {
+Message::Message(const std::string& raw) : _raw(raw), _complete(true)
+{
+    if (_raw.find("\r\n") == std::string::npos)
+    {
         _complete = false;
-    } else {
+    }
+    else {
         // Remove \r\n from the end
         size_t crlfPos = _raw.find("\r\n");
         _raw = _raw.substr(0, crlfPos);
@@ -53,27 +40,34 @@ std::string Message::getTrailing() const {
 }
 
 void Message::extractPrefix() {
-    if (_raw.empty() || _raw[0] != ':') {
+    if (_raw.empty() || _raw[0] != ':')
+    {
         return;
     }
 
     size_t spacePos = _raw.find(' ');
-    if (spacePos != std::string::npos) {
+    if (spacePos != std::string::npos)
+    {
         _prefix = _raw.substr(1, spacePos - 1);
         _raw = _raw.substr(spacePos + 1);
-    } else {
+    }
+    else
+    {
         _raw = "";
     }
 }
 
-void Message::extractCommandAndParams() {
-    if (_raw.empty()) {
+void Message::extractCommandAndParams()
+{
+    if (_raw.empty())
+    {
         return;
     }
 
     // Extract command
     size_t spacePos = _raw.find(' ');
-    if (spacePos != std::string::npos) {
+    if (spacePos != std::string::npos)
+    {
         _command = _raw.substr(0, spacePos);
         _raw = _raw.substr(spacePos + 1);
     } else {

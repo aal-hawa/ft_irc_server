@@ -4,6 +4,7 @@
 #include "../includes/Message.hpp"
 #include "../includes/Utils.hpp"
 #include <sstream>
+#include <set>
 
 static void tryRegister(Server* server, Client*client)
 {
@@ -70,7 +71,8 @@ void Command_PASS(Server* server, Client* client, const Message& message) {
 }
 
 // NICK Command
-void Command_NICK(Server* server, Client* client, const Message& message) {
+void Command_NICK(Server* server, Client* client, const Message& message)
+{
     std::vector<std::string> params = message.getParams();
 
     if (params.empty()) {
@@ -85,16 +87,31 @@ void Command_NICK(Server* server, Client* client, const Message& message) {
         return;
     }
 
-    if (server->getClientByNickname(newNick)) {
-        client->sendToClient("433 " + newNick + " :Nickname is already in use");
+    Client* nickOwner = server->getClientByNickname(newNick);
+    if (nickOwner && nickOwner != client) {
+        client->sendToClient(":" + server->getHostname() + " 433 " + newNick + " :Nickname is already in use");
         return;
     }
 
     std::string oldNick = client->getNickname();
+    std::string oldPrefix = client->getPrefix();
     client->setNickname(newNick);
 
     if (client->isRegistered() && !oldNick.empty()) {
-        client->sendToClient(":" + oldNick + " NICK :" + newNick);
+        std::string nickMsg = ":" + oldPrefix + " NICK :" + newNick;
+        std::set<int> sentTo;
+        std::vector<Channel*> channels = server->getChannelsByClient(client);
+        for (size_t i = 0; i < channels.size(); ++i) {
+            const std::map<int, Client*>& members = channels[i]->getMembers();
+            for (std::map<int, Client*>::const_iterator it = members.begin(); it != members.end(); ++it) {
+                if (sentTo.insert(it->first).second) {
+                    it->second->sendToClient(nickMsg);
+                }
+            }
+        }
+        if (sentTo.empty()) {
+            client->sendToClient(nickMsg);
+        }
     }
 
     tryRegister(server, client);
@@ -135,7 +152,8 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         keys = Utils::split(params[1], ',');
     }
 
-    for (size_t i = 0; i < channels.size(); ++i) {
+    for (size_t i = 0; i < channels.size(); ++i)
+    {
         std::string channelName = channels[i];
         std::string key = (i < keys.size()) ? keys[i] : "";
 
@@ -169,14 +187,18 @@ void Command_JOIN(Server* server, Client* client, const Message& message) {
         }
 
         channel->addMember(client);
-        if (channel->getMemberCount() == 1) {
+        channel->uninviteUser(client->getNickname());
+
+        if (channel->getMemberCount() == 1)
+        {
             channel->addOperator(client);
         }
 
         client->sendToClient(":" + client->getPrefix() + " JOIN :" + channelName);
 
         // Send topic
-        if (!channel->getTopic().empty()) {
+        if (!channel->getTopic().empty())
+        {
             client->sendToClient("332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
         }
 
@@ -229,18 +251,24 @@ void Command_PART(Server* server, Client* client, const Message& message) {
 void Command_PRIVMSG(Server* server, Client* client, const Message& message) {
     std::vector<std::string> params = message.getParams();
 
+    if (params.empty()) {
+        client->sendToClient(":" + server->getHostname() + " 411 * :No recipient given (PRIVMSG)");
+        return;
+    }
+
     if (params.size() < 2) {
-        if (params.size() < 1) {
-            client->sendToClient("411 * :No recipient given (PRIVMSG)");
-        }
-        client->sendToClient("412 * :No text to send");
+        client->sendToClient(":" + server->getHostname() + " 412 * :No text to send");
         return;
     }
 
     std::string target = params[0];
     std::string text = params[1];
 
-    // Check if target is a channel
+    if (target.empty()) {
+        client->sendToClient(":" + server->getHostname() + " 411 * :No recipient given (PRIVMSG)");
+        return;
+    }
+
     if (target[0] == '#' || target[0] == '&') {
         Channel* channel = server->getChannel(target);
         if (!channel) {
@@ -255,9 +283,7 @@ void Command_PRIVMSG(Server* server, Client* client, const Message& message) {
 
         std::string msg = ":" + client->getPrefix() + " PRIVMSG " + target + " :" + text;
         server->broadcastToChannel(channel, msg, client);
-    }
-    // Check if target is a user
-    else {
+    } else {
         Client* targetClient = server->getClientByNickname(target);
         if (!targetClient) {
             client->sendToClient("401 " + target + " :No such nick/channel");
@@ -360,7 +386,8 @@ void Command_INVITE(Server* server, Client* client, const Message& message) {
         return;
     }
 
-    if (channel->isInviteOnly() && !channel->isOperator(client)) {
+   if (!channel->isOperator(client))
+    {
         client->sendToClient("482 " + channelName + " :You're not channel operator");
         return;
     }
@@ -408,7 +435,7 @@ void Command_TOPIC(Server* server, Client* client, const Message& message) {
         if (channel->getTopic().empty()) {
             client->sendToClient("331 " + client->getNickname() + " " + channelName + " :No topic is set");
         } else {
-            client->sendToClient("332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
+            client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
         }
         return;
     }
@@ -421,7 +448,7 @@ void Command_TOPIC(Server* server, Client* client, const Message& message) {
 
     std::string newTopic = params[1];
     channel->setTopic(newTopic);
-    server->broadcastToChannel(channel, ":" + server->getHostname() + " TOPIC " + channelName + " :" + newTopic, NULL);
+    server->broadcastToChannel(channel, ":" + client->getPrefix() + " TOPIC " + channelName + " :" + newTopic, NULL);
 }
 
 // MODE Command
@@ -493,12 +520,18 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                         client->sendToClient("461 " + target + " MODE :Not enough parameters");
                         continue;
                     }
-                    unsigned int limit = Utils::atoi(params[paramIndex++]);
+                std::string limitStr = params[paramIndex++];
+                if (!Utils::isPositiveNumber(limitStr) || Utils::atoi(limitStr) <= 0)
+                {
+                    client->sendToClient(":" + server->getHostname() + " 461 " + target + " MODE :Invalid limit");
+                    continue;
+                }
+                    unsigned int limit = static_cast <unsigned int>(Utils::atoi(limitStr));
                     channel->setUserLimit(limit);
                 } else {
                     channel->setUserLimit(0);
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "l", NULL);
+                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "l", NULL);
             } else if (c == 'o') {
                 if (paramIndex >= params.size()) {
                     client->sendToClient("461 " + target + " MODE :Not enough parameters");
@@ -514,7 +547,7 @@ void Command_MODE(Server* server, Client* client, const Message& message) {
                 } else {
                     channel->removeOperator(targetClient);
                 }
-                server->broadcastToChannel(channel, ":" + server->getHostname() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
+               server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
             }
         }
     }

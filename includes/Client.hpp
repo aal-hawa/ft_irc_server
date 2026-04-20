@@ -8,8 +8,6 @@
 #include <unistd.h>
 #include <cstring>
 
-#include <netdb.h>
-
 // class Server;
 
 class Client {

@@ -15,6 +15,7 @@ public:
     static std::string toUpper(const std::string& str);
     static void trim(std::string& str);
     static int atoi(const std::string& str);
+    static bool isPositiveNumber(const std::string& str);
     static std::string getCurrentTime();
 };
 

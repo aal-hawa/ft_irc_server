@@ -109,6 +109,21 @@ int Utils::atoi(const std::string& str) {
     ss >> result;
     return result;
 }
+bool Utils::isPositiveNumber(const std::string& str)
+{
+    if (str.empty())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < str.size(); ++i)
+    {
+        if (!std::isdigit(static_cast<unsigned char>(str[i])))
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 std::string Utils::getCurrentTime() {
     time_t now = time(0);
