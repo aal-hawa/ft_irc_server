@@ -102,8 +102,9 @@ Client* Server::getClientByFd(int fd) const {
 }
 
 Client* Server::getClientByNickname(const std::string& nickname) const {
+    std::string normalized = Utils::normalizeNickname(nickname);
     for (std::map<int, Client*>::const_iterator it = _clients.begin(); it != _clients.end(); ++it) {
-        if (it->second->getNickname() == nickname) {
+        if (Utils::normalizeNickname(it->second->getNickname()) == normalized) {
             return it->second;
         }
     }
@@ -417,12 +418,17 @@ void Server::processCommand(Client* client, const std::string& messageStr) {
 
     std::string command = Utils::toUpper(message.getCommand());
 
+    if (command.empty()) {
+        return;
+    }
+
     if (!client->isRegistered() &&
         command != "CAP" &&
         command != "PASS" &&
         command != "NICK" &&
         command != "USER" &&
         command != "PING" &&
+        command != "PONG" &&
         command != "QUIT") {
         client->sendToClient(":" + _hostname + " 451 * :You have not registered");
         return;
@@ -434,6 +440,8 @@ void Server::processCommand(Client* client, const std::string& messageStr) {
         Command_CAP(this, client, message);
     } else if (command == "PING") {
         Command_PING(this, client, message);
+    } else if (command == "PONG") {
+        Command_PONG(this, client, message);
     } else if (command == "NICK") {
         Command_NICK(this, client, message);
     } else if (command == "USER") {

@@ -24,24 +24,29 @@ static void tryRegister(Server* server, Client*client)
 //PING
 void Command_PING(Server* server, Client* client, const Message& message)
 {
-    (void)server;
     std::vector<std::string> params = message.getParams();
     std::string token;
     if(!params.empty())
         token = params[0];
-    client-> sendToClient(":ircserv PONG :" + token);
+    client->sendToClient(":" + server->getHostname() + " PONG :" + token);
+}
+
+void Command_PONG(Server* server, Client* client, const Message& message)
+{
+    (void)server;
+    (void)client;
+    (void)message;
 }
 
 //CAP 
 void Command_CAP(Server* server, Client* client, const Message& message)
 {
-    (void)server;
     std::vector<std::string> params = message.getParams();
     if (params.empty()) return;
 
      if (!params.empty() && params[0] == "LS")
     {
-        client->sendToClient(":ircserv CAP * LS :");
+        client->sendToClient(":" + server->getHostname() + " CAP * LS :");
     }
 }
 
@@ -176,7 +181,7 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
                 continue;
             }
 
-            if (channel->isInviteOnly() && !channel->isInvited(client->getNickname())) {
+            if (channel->isInviteOnly() && !channel->isInvited(client)) {
                 client->sendToClient("473 " + channelName + " :Cannot join channel (+i)");
                 continue;
             }
@@ -193,7 +198,7 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
         }
 
         channel->addMember(client);
-        channel->uninviteUser(client->getNickname());
+        channel->uninviteUser(client);
 
         if (channel->getMemberCount() == 1) {
             channel->addOperator(client);
@@ -224,7 +229,7 @@ void Command_PART(Server* server, Client* client, const Message& message) {
     }
 
     std::vector<std::string> channels = Utils::split(params[0], ',');
-    std::string reason = (params.size() > 1) ? params[1] : client->getNickname();
+    std::string reason = (params.size() > 1) ? params[1] : "";
 
     for (size_t i = 0; i < channels.size(); ++i) {
         std::string channelName = channels[i];
@@ -240,7 +245,10 @@ void Command_PART(Server* server, Client* client, const Message& message) {
             continue;
         }
 
-        std::string partMsg = ":" + client->getPrefix() + " PART " + channelName + " :" + reason;
+        std::string partMsg = ":" + client->getPrefix() + " PART " + channelName;
+        if (!reason.empty()) {
+            partMsg += " :" + reason;
+        }
         server->broadcastToChannel(channel, partMsg, NULL);
         channel->removeMember(client);
 
@@ -407,8 +415,9 @@ void Command_INVITE(Server* server, Client* client, const Message& message) {
         return;
     }
 
-    channel->inviteUser(nickname);
-    client->sendToClient("341 " + client->getNickname() + " " + nickname + " " + channelName);
+    channel->inviteUser(targetClient);
+    client->sendToClient(":" + server->getHostname() + " 341 " +
+        client->getNickname() + " " + nickname + " :" + channelName);
     targetClient->sendToClient(":" + client->getPrefix() + " INVITE " + nickname + " :" + channelName);
 }
 
@@ -474,13 +483,28 @@ void Command_MODE(Server* server, Client* client, const Message& message)
         }
 
         if (params.size() == 1) {
-            // View current modes
             std::string modes = "+";
-            if (channel->isInviteOnly()) modes += "i";
-            if (channel->isTopicRestricted()) modes += "t";
-            if (!channel->getKey().empty()) modes += "k";
-            if (channel->getUserLimit() > 0) modes += "l";
-            client->sendToClient(":" + server->getHostname() + " 324 " + client->getNickname() + " " + target + " " + modes);
+            std::string extra;
+
+            if (channel->isInviteOnly()) {
+                modes += "i";
+            }
+            if (channel->isTopicRestricted()) {
+                modes += "t";
+            }
+            if (!channel->getKey().empty()) {
+                modes += "k";
+                extra += " " + channel->getKey();
+            }
+            if (channel->getUserLimit() > 0) {
+                std::ostringstream oss;
+                oss << channel->getUserLimit();
+                modes += "l";
+                extra += " " + oss.str();
+            }
+
+            client->sendToClient(":" + server->getHostname() + " 324 " +
+                client->getNickname() + " " + target + " " + modes + extra);
             return;
         }
 
@@ -512,28 +536,42 @@ void Command_MODE(Server* server, Client* client, const Message& message)
                         client->sendToClient("461 " + target + " MODE :Not enough parameters");
                         continue;
                     }
-                    channel->setKey(params[paramIndex++]);
+
+                    std::string key = params[paramIndex++];
+                    channel->setKey(key);
+                    server->broadcastToChannel(channel,
+                        ":" + client->getPrefix() + " MODE " + target + " +k " + key,
+                        NULL);
                 } else {
                     channel->setKey("");
+                    server->broadcastToChannel(channel,
+                        ":" + client->getPrefix() + " MODE " + target + " -k",
+                        NULL);
                 }
-server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "k", NULL);            } else if (c == 'l') {
+            } else if (c == 'l') {
                 if (adding) {
                     if (paramIndex >= params.size()) {
                         client->sendToClient("461 " + target + " MODE :Not enough parameters");
                         continue;
                     }
-                std::string limitStr = params[paramIndex++];
-                if (!Utils::isPositiveNumber(limitStr) || Utils::atoi(limitStr) <= 0)
-                {
-                    client->sendToClient(":" + server->getHostname() + " 461 " + target + " MODE :Invalid limit");
-                    continue;
-                }
-                    unsigned int limit = static_cast <unsigned int>(Utils::atoi(limitStr));
+
+                    std::string limitStr = params[paramIndex++];
+                    if (!Utils::isPositiveNumber(limitStr) || Utils::atoi(limitStr) <= 0) {
+                        client->sendToClient(":" + server->getHostname() + " 461 " + target + " MODE :Invalid limit");
+                        continue;
+                    }
+
+                    unsigned int limit = static_cast<unsigned int>(Utils::atoi(limitStr));
                     channel->setUserLimit(limit);
+                    server->broadcastToChannel(channel,
+                        ":" + client->getPrefix() + " MODE " + target + " +l " + limitStr,
+                        NULL);
                 } else {
                     channel->setUserLimit(0);
+                    server->broadcastToChannel(channel,
+                        ":" + client->getPrefix() + " MODE " + target + " -l",
+                        NULL);
                 }
-                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "l", NULL);
             } else if (c == 'o') {
                 if (paramIndex >= params.size()) {
                     client->sendToClient("461 " + target + " MODE :Not enough parameters");
@@ -552,5 +590,21 @@ server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + targe
                server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
             }
         }
+    } else {
+        if (target != client->getNickname()) {
+            client->sendToClient(":" + server->getHostname() + " 502 " +
+                client->getNickname() + " :Cannot change mode for other users");
+            return;
+        }
+
+        if (params.size() == 1) {
+            client->sendToClient(":" + server->getHostname() + " 221 " +
+                client->getNickname() + " +");
+            return;
+        }
+
+        client->sendToClient(":" + server->getHostname() + " 501 " +
+            client->getNickname() + " :Unknown MODE flag");
+        return;
     }
 }

@@ -15,7 +15,7 @@ private:
     std::string _key;
     std::map<int, Client*> _members;
     std::set<int> _operators;
-    std::set<std::string> _invited;
+    std::set<int> _invited;
     bool _inviteOnly;
     bool _topicRestricted;
     unsigned int _userLimit;
@@ -53,9 +53,9 @@ public:
     bool isOperator(Client* client) const;
 
     // Invite management
-    void inviteUser(const std::string& nickname);
-    bool isInvited(const std::string& nickname) const;
-    void uninviteUser(const std::string& nickname);
+    void inviteUser(Client* client);
+    bool isInvited(Client* client) const;
+    void uninviteUser(Client* client);
 };
 
 #endif

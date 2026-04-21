@@ -70,6 +70,24 @@ bool Utils::isValidChannelName(const std::string& channel) {
     return true;
 }
 
+std::string Utils::normalizeNickname(const std::string& nickname) {
+    std::string normalized = nickname;
+    for (size_t i = 0; i < normalized.length(); ++i) {
+        if (normalized[i] >= 'A' && normalized[i] <= 'Z') {
+            normalized[i] = normalized[i] - 'A' + 'a';
+        } else if (normalized[i] == '{') {
+            normalized[i] = '[';
+        } else if (normalized[i] == '}') {
+            normalized[i] = ']';
+        } else if (normalized[i] == '|') {
+            normalized[i] = '\\';
+        } else if (normalized[i] == '~') {
+            normalized[i] = '^';
+        }
+    }
+    return normalized;
+}
+
 std::vector<std::string> Utils::split(const std::string& str, char delimiter) {
     std::vector<std::string> tokens;
     std::stringstream ss(str);

@@ -23,5 +23,6 @@ void Command_TOPIC(Server* server, Client* client, const Message& message);
 void Command_MODE(Server* server, Client* client, const Message& message);
 void Command_CAP(Server* server, Client* client, const Message& message);
 void Command_PING(Server* server, Client* client, const Message& message);
+void Command_PONG(Server* server, Client* client, const Message& message);
 
 #endif

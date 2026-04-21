@@ -113,14 +113,21 @@ bool Channel::isOperator(Client* client) const {
     return _operators.find(client->getFd()) != _operators.end();
 }
 
-void Channel::inviteUser(const std::string& nickname) {
-    _invited.insert(nickname);
+void Channel::inviteUser(Client* client) {
+    if (client) {
+        _invited.insert(client->getFd());
+    }
 }
 
-bool Channel::isInvited(const std::string& nickname) const {
-    return _invited.find(nickname) != _invited.end();
+bool Channel::isInvited(Client* client) const {
+    if (!client) {
+        return false;
+    }
+    return _invited.find(client->getFd()) != _invited.end();
 }
 
-void Channel::uninviteUser(const std::string& nickname) {
-    _invited.erase(nickname);
+void Channel::uninviteUser(Client* client) {
+    if (client) {
+        _invited.erase(client->getFd());
+    }
 }
