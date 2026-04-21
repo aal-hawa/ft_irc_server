@@ -6,10 +6,10 @@ Channel::Channel(const std::string& name, Client* founder)
       _inviteOnly(false),
       _topicRestricted(false),
       _userLimit(0) {
-    if (founder) {
-        _members[founder->getFd()] = founder;
-        _operators.insert(founder->getFd());
-    }
+    // FIX: Do NOT add founder as member/operator here.
+    // Command_JOIN handles addMember/addOperator/uninviteUser uniformly
+    // for both new and existing channels. Adding here caused double-add.
+    (void)founder;
 }
 
 Channel::~Channel() {

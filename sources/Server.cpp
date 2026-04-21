@@ -158,7 +158,9 @@ void Server::sendWelcome(Client* client) {
     client->sendToClient(":" + _hostname + " 001 " + client->getNickname() + " :Welcome to the Internet Relay Network " + client->getPrefix());
     client->sendToClient(":" + _hostname + " 002 " + client->getNickname() + " :Your host is " + _hostname + ", running version ft_irc");
     client->sendToClient(":" + _hostname + " 003 " + client->getNickname() + " :This server was created " + _creationTime);
-    client->sendToClient(":" + _hostname + " 004 " + client->getNickname() + " " + _hostname + " ft_irc i o");
+    // FIX: 004 RPL_MYINFO format is: servername version user_modes channel_modes
+    // 'i', 'k', 'o', 't', 'l' are all CHANNEL modes, not user modes
+    client->sendToClient(":" + _hostname + " 004 " + client->getNickname() + " " + _hostname + " ft_irc * ikotl");
 }
 
 void Server::sendNames(Client* client, Channel* channel)
@@ -237,7 +239,7 @@ void Server::acceptNewConnection() {
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
 
-    int clientFd= accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+    int clientFd = accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
     if (clientFd == -1)
     {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
@@ -269,7 +271,7 @@ void Server::flushClientOutput(int clientFd)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
             {
-                //Not ready to wring, waiting for poll()
+                // Not ready to write, waiting for poll()
                 return;
             }
             handleClientDisconnect(clientFd);
@@ -288,9 +290,8 @@ void Server::flushClientOutput(int clientFd)
             msg.erase(0, sent);
             return;
         }
-        client-> popFrontSendBuffer();
+        client->popFrontSendBuffer();
     }
-
 }
 
 
@@ -322,49 +323,48 @@ void Server::runPollLoop() {
             break;
         }
 
- size_t i = 0;
-    while (i < _pollFds.size())
-    {
-        short re = _pollFds[i].revents;
-        int fd = _pollFds[i].fd;
-
-        // broken/disconnected socket
-        if (re & (POLLHUP | POLLERR | POLLNVAL))
+        size_t i = 0;
+        while (i < _pollFds.size())
         {
-            if (fd != _serverSocket)
-                handleClientDisconnect(fd);
+            short re = _pollFds[i].revents;
+            int fd = _pollFds[i].fd;
+
+            // broken/disconnected socket
+            if (re & (POLLHUP | POLLERR | POLLNVAL))
+            {
+                if (fd != _serverSocket)
+                    handleClientDisconnect(fd);
+
+                if (fd == _serverSocket || getClientByFd(fd) != NULL)
+                    ++i;
+                continue;
+            }
+
+            // readable
+            if (re & POLLIN)
+            {
+                if (fd == _serverSocket)
+                    acceptNewConnection();
+                else
+                    handleClientData(fd);
+            }
+
+            // if client was removed during read handling, do not use fd again
+            if (fd != _serverSocket && getClientByFd(fd) == NULL)
+                continue;
+
+            // writable
+            if (re & POLLOUT)
+                flushClientOutput(fd);
 
             if (fd == _serverSocket || getClientByFd(fd) != NULL)
                 ++i;
-            continue;
         }
-
-        // readable
-        if (re & POLLIN)
-        {
-            if (fd == _serverSocket)
-                acceptNewConnection();
-            else
-                handleClientData(fd);
-        }
-
-        // if client was removed during read handling, do not use fd again
-        if (fd != _serverSocket && getClientByFd(fd) == NULL)
-            continue;
-
-        // writable
-        if (re & POLLOUT)
-            flushClientOutput(fd);
-
-        if (fd == _serverSocket || getClientByFd(fd) != NULL)
-            ++i;
-    }
     }
 }
 
 void Server::handleClientData(int clientFd)
 {
-
     char buffer[1024];
     ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
 
@@ -389,7 +389,6 @@ void Server::handleClientData(int clientFd)
 
         while (client->hasCompleteMessage())
         {
-
             std::string messageStr = client->getNextMessage();
             if (!messageStr.empty()) {
                 processCommand(client, messageStr);
@@ -402,7 +401,6 @@ void Server::handleClientData(int clientFd)
 
 void Server::handleClientDisconnect(int clientFd)
 {
-
     Client* client = getClientByFd(clientFd);
     if (client) {
         Command_QUIT(this, client, Message("QUIT :Client disconnected"));
@@ -452,6 +450,8 @@ void Server::processCommand(Client* client, const std::string& messageStr) {
         Command_PART(this, client, message);
     } else if (command == "PRIVMSG") {
         Command_PRIVMSG(this, client, message);
+    } else if (command == "NOTICE") {
+        Command_NOTICE(this, client, message);
     } else if (command == "QUIT") {
         Command_QUIT(this, client, message);
     } else if (command == "KICK") {
