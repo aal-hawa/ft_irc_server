@@ -1,336 +1,121 @@
-*This project has been created as part of the 42 curriculum by aal-hawa.*
+*This project has been created as part of the 42 curriculum by aal-hawa (Hassan, Tamim).*
 
-# ft_irc - IRC Server Implementation
-A complete IRC (Internet Relay Chat) server implementation in C++ 98 for the 42 School project.
+# ft_irc
 
----
+## Description
 
-## Features
+**ft_irc** is an IRC (Internet Relay Chat) server implemented in C++ 98. The project was developed as part of the 42 Abu Dhabi curriculum to deepen understanding of network programming, the TCP/IP protocol stack, and the IRC communication protocol defined in RFC 2812.
 
-- **Multi-client support** using non-blocking I/O and `poll()`
-- **Non-blocking operations only** - no forking
-- **Single `poll()` call** for all I/O operations (POLLIN and POLLOUT)
-- **Buffered sending** - messages are only sent when `poll()` indicates POLLOUT is ready
-- **Both `\r\n` and `\n` support** - compatible with telnet and nc (netcat)
-- **Basic IRC commands**: PASS, NICK, USER, JOIN, PART, PRIVMSG, QUIT
-- **Channel operations**: JOIN, PART, KICK, INVITE, TOPIC, MODE
-- **Channel modes**: `i` (invite-only), `t` (topic restricted), `k` (key), `o` (operator), `l` (limit)
-- **Keepalive support**: PING/PONG commands
-- **Proper error handling** with RFC 2812 compliant responses
-- **Partial message handling** to support fragmented data
-- **Memory leak-free** implementation
+The server listens on a specified port for incoming IRC client connections and handles multiple clients simultaneously using a single `poll()` call with non-blocking file descriptors. It supports the full set of mandatory IRC features required by the project specification: user authentication (PASS), nickname and username registration (NICK, USER), channel management (JOIN, PART, INVITE, KICK, TOPIC, MODE), and private messaging (PRIVMSG, NOTICE). Channel operator privileges are enforced through the MODE command with support for the `i` (invite-only), `t` (topic restricted), `k` (channel key), `o` (operator), and `l` (user limit) mode flags.
 
----
+The server is designed to be compatible with standard IRC clients such as **irssi**, which serves as the reference client for evaluation. All communication follows the IRC message format with proper numeric replies as defined in RFC 2812. The implementation handles partial message reassembly, ensuring that commands split across multiple TCP packets are correctly reconstructed before processing.
 
-## Requirements
+### Key Features
 
-- **Language**: C++ 98 standard
-- **Compiler**: clang++ or g++
-- **Operating System**: Unix-based (Linux, macOS)
-- **External Libraries**: None (only standard socket functions)
+- **Non-blocking I/O**: All socket operations use non-blocking file descriptors managed by a single `poll()` loop, ensuring the server never hangs while handling multiple clients.
+- **Multi-client support**: The server can handle many simultaneous connections without forking, using an event-driven architecture.
+- **Full mandatory command set**: PASS, NICK, USER, QUIT, JOIN, PART, KICK, INVITE, TOPIC, MODE, PRIVMSG, NOTICE.
+- **Channel modes**: `+i` (invite-only), `+t` (topic restricted to operators), `+k` (channel key/password), `+o` (channel operator), `+l` (user limit).
+- **Partial message handling**: Correctly reassembles IRC messages that arrive in fragmented TCP packets, including support for both `\r\n` and `\n` line endings.
+- **irssi compatible**: Tested and verified to work with the irssi IRC client as the reference implementation.
 
----
+## Instructions
 
-## Project Structure
+### Prerequisites
 
-```
-ft_irc_server/
-├── includes/          # Header files
-│   ├── Server.hpp     # Main server class
-│   ├── Client.hpp     # Client class
-│   ├── Channel.hpp    # Channel class
-│   ├── Message.hpp    # Message parser
-│   ├── Commands.hpp   # Command declarations
-│   └── Utils.hpp      # Utility functions
-├── sources/           # Source files
-│   ├── main.cpp       # Entry point
-│   ├── Server.cpp     # Server implementation
-│   ├── Client.cpp     # Client implementation
-│   ├── Channel.cpp    # Channel implementation
-│   ├── Message.cpp    # Message parser implementation
-│   ├── Commands.cpp   # Command implementations
-│   └── Utils.cpp      # Utility functions implementation
-├── scripts/           # Test scripts
-│   ├── test_basic_commands.sh
-│   ├── test_channel_operations.sh
-│   ├── test_operator_commands.sh
-│   ├── test_stress.sh
-│   └── final_test.sh
-├── Makefile           # Build configuration
-└── README.md          # This file
-```
+- A C++ compiler supporting C++ 98 (g++ or clang++)
+- Make
 
----
+### Compilation
 
-## Building
+Clone the repository and build the project:
 
 ```bash
-# Clean build
-make clean
-
-# Compile the project
+git clone https://github.com/aal-hawa/ft_irc_server.git
+cd ft_irc_server
 make
-
-# Force rebuild
-make re
 ```
 
----
+The Makefile supports the following rules:
 
-## Usage
+| Rule | Description |
+|------|-------------|
+| `make` or `make all` | Compiles the project and produces the `ircserv` executable |
+| `make clean` | Removes object files |
+| `make fclean` | Removes object files and the executable |
+| `make re` | Performs `fclean` followed by `all` |
+
+### Running the Server
+
+Start the server by providing a port number and a connection password:
 
 ```bash
 ./ircserv <port> <password>
 ```
 
-**Example:**
+- **port**: The TCP port number on which the server will listen for incoming IRC connections (e.g., `6667`).
+- **password**: The password that IRC clients must provide using the `PASS` command before registering.
+
+Example:
+
 ```bash
-./ircserv 6667 mypassword
+./ircserv 6667 secretpass
 ```
 
----
+### Connecting with an IRC Client
 
-## Connecting to the Server
+Using **irssi** as the reference client:
 
-### Using netcat (nc):
 ```bash
-nc -C localhost 6667
-PASS mypassword
-NICK mynickname
-USER myusername 0 * :My Real Name
+irssi -c 127.0.0.1 -p 6667 -w secretpass -n yournick
+```
+
+Or using **nc** (netcat) for raw testing:
+
+```bash
+nc -C 127.0.0.1 6667
+PASS secretpass
+NICK yournick
+USER yournick 0 * :Your Name
 JOIN #testchannel
 PRIVMSG #testchannel :Hello everyone!
 ```
 
-### Using telnet:
-```bash
-telnet localhost 6667
-PASS mypassword
-NICK mynickname
-USER myusername 0 * :My Real Name
-JOIN #testchannel
-PRIVMSG #testchannel :Hello everyone!
-```
+### Testing Partial Message Handling
 
-### Using IRC client (irssi):
-```bash
-irssi -c localhost -p 6667 -w mypassword
-```
-
-### Using IRC client (HexChat):
-- Server: `localhost`
-- Port: `6667`
-- Password: `mypassword`
-
----
-
-## Implemented Commands
-
-### Authentication Commands
-
-#### PASS
-Set the connection password
-```
-PASS <password>
-```
-
-#### NICK
-Set or change your nickname
-```
-NICK <nickname>
-```
-
-#### USER
-Set your username and realname
-```
-USER <username> <mode> <unused> :<realname>
-```
-
-### Channel Commands
-
-#### JOIN
-Join one or more channels
-```
-JOIN <channel>[,<channel>...] [<key>[,<key>...]]
-```
-
-#### PART
-Leave one or more channels
-```
-PART <channel>[,<channel>...] [<reason>]
-```
-
-#### PRIVMSG
-Send a private message to user or channel
-```
-PRIVMSG <target> :<message>
-```
-
-#### QUIT
-Disconnect from the server
-```
-QUIT [<reason>]
-```
-
-### Operator Commands
-
-#### KICK
-Remove a user from a channel
-```
-KICK <channel> <user> [:<comment>]
-```
-
-#### INVITE
-Invite a user to a channel
-```
-INVITE <nickname> <channel>
-```
-
-#### TOPIC
-View or change the channel topic
-```
-TOPIC <channel> [:<topic>]
-```
-
-#### MODE
-View or change channel modes
-```
-MODE <channel> [<modes> [<mode parameters>]]
-```
-
-**Available modes:**
-- `+i` / `-i`: Invite-only channel
-- `+t` / `-t`: Topic restricted to operators
-- `+k <key>` / `-k`: Set/remove channel key
-- `+o <nick>` / `-o <nick>`: Give/take operator privilege
-- `+l <limit>` / `-l`: Set/remove user limit
-
-### Keepalive Commands
-
-#### PING
-Check server connection
-```
-PING <server>
-```
-
-#### PONG
-Respond to PING
-```
-PONG <server>
-```
-
----
-
-## Testing
-
-All test scripts are located in the `scripts/` directory:
+As specified in the subject, you can test that the server correctly handles partial data by sending a command in fragments using `Ctrl+D` in nc:
 
 ```bash
-# Make all scripts executable
-chmod +x scripts/*.sh
-
-# Run basic commands test
-./scripts/test_basic_commands.sh
-
-# Run channel operations test
-./scripts/test_channel_operations.sh
-
-# Run operator commands test
-./scripts/test_operator_commands.sh
-
-# Run stress test (20 clients)
-./scripts/test_stress.sh
-
-# Run complete final test suite
-./scripts/final_test.sh
+nc -C 127.0.0.1 6667
+com^Dman^Dd
 ```
 
-### Partial Message Test
-To test partial message handling:
-```bash
-nc -C localhost 6667
-# Type: PASS testpass, press Ctrl+D
-# Type: mypass, press Ctrl+D
-# Type: word, press Enter
-```
+Where `^D` is `Ctrl+D`, sending "com", then "man", then "d\n" — the server should reassemble these into the full command "command".
 
-### Memory Leak Check
-```bash
-valgrind --leak-check=full --show-leak-kinds=all ./ircserv 6667 testpass
-```
+## Resources
 
----
+### IRC Protocol Documentation
 
-## Error Codes
+- [RFC 2812 - Internet Relay Chat: Client Protocol](https://www.rfc-editor.org/rfc/rfc2812): The primary reference for IRC client-server communication, message format, numeric replies, and command specifications.
+- [RFC 2813 - Internet Relay Chat: Server Protocol](https://www.rfc-editor.org/rfc/rfc2813): Reference for server-to-server communication (not implemented in this project, but useful for understanding the full IRC architecture).
+- [RFC 1459 - Internet Relay Chat Protocol](https://www.rfc-editor.org/rfc/rfc1459): The original IRC protocol specification, superseded by RFC 2812 but still valuable for historical context and foundational concepts.
 
-The server implements standard IRC error codes:
+### Network Programming
 
-| Code | Description |
-|------|-------------|
-| `401` | No such nick/channel |
-| `403` | No such channel |
-| `404` | Cannot send to channel |
-| `411` | No recipient given (PRIVMSG) |
-| `412` | No text to send |
-| `421` | Unknown command |
-| `431` | No nickname given |
-| `432` | Erroneus nickname |
-| `433` | Nickname already in use |
-| `441` | User not in channel |
-| `442` | You're not on that channel |
-| `443` | User already in channel |
-| `461` | Not enough parameters |
-| `462` | Already registered |
-| `464` | Password incorrect |
-| `471` | Cannot join (channel full) |
-| `473` | Cannot join (invite only) |
-| `475` | Cannot join (wrong key) |
-| `482` | Not channel operator |
+- [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/): A comprehensive and accessible guide to socket programming in C/C++, covering TCP/IP fundamentals, `poll()`/`select()`, and non-blocking I/O.
+- [Linux `poll()` man page](https://man7.org/linux/man-pages/man2/poll.2.html): Official documentation for the `poll()` system call used for I/O multiplexing.
 
----
+### IRC Client
 
-## Technical Details
+- [irssi - The client of the future](https://irssi.org/): The reference IRC client used for testing this server. Open-source, terminal-based, and widely available on Linux and macOS.
 
-- **Socket Management**: Non-blocking sockets with `fcntl()`
-- **Event Loop**: Single `poll()` call handles all I/O events (POLLIN and POLLOUT)
-- **Buffered Sending**: Messages are queued and only sent when `poll()` indicates POLLOUT
-- **Message Parsing**: RFC 2812 compliant message format
-- **Connection Handling**: Each client has its own buffer for partial messages
-- **Channel Management**: Dynamic channel creation and deletion
-- **Operator System**: First user in channel becomes operator by default
+### AI Usage
 
----
+AI tools were used during this project primarily for the following tasks:
 
-## Compliance
+- **Understanding RFC 2812**: Assisting in interpreting specific sections of the IRC protocol specification, particularly the numeric reply formats and the expected behavior of each command.
+- **Debugging numeric reply formatting**: Helping identify cases where server responses did not conform to the `:servername numeric nick ...` format required by RFC 2812.
+- **Verifying edge cases**: Discussing corner cases such as partial message handling, nickname case-insensitivity rules per IRC convention, and the correct behavior of the INVITE command on invite-only versus non-invite-only channels.
+- **Code review**: Reviewing command implementations for correctness against the specification, such as ensuring NOTICE never sends error replies and MODE broadcasts include all parameter values.
 
-This implementation complies with:
-- **RFC 2812**: Internet Relay Chat: Client Protocol
-- **42 School ft_irc project requirements**
-- **C++ 98 standard**
-- **Non-blocking I/O with single `poll()`**
-- **Both `\r\n` (telnet) and `\n` (nc) line endings**
-
----
-
-## License
-
-This project is part of the 42 School curriculum.
-
----
-
-## Authors
-
-- **Team Member A**: Network layer, Server core, Message parsing, Basic commands
-- **Team Member B**: Data structures, Channel operations, Operator commands, Testing
-
----
-
-## References
-
-- [RFC 2812 - IRC Client Protocol](https://tools.ietf.org/html/rfc2812)
-- [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/)
-- [IRC Protocol Documentation](https://irc-wiki.org/IRC_Protocol)
-
----
-
-**Good luck with your evaluation!**
+All AI-generated suggestions were thoroughly reviewed, tested, and validated before being incorporated into the final codebase.
