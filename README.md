@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by aal-hawa (Hassan, Tamim).*
+*This project has been created as part of the 42 curriculum by aal-hawa, hassaleh, tmahmoud.*
 
 # ft_irc
 
