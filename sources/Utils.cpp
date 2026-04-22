@@ -55,14 +55,16 @@ bool Utils::isValidChannelName(const std::string& channel) {
         return false;
     }
 
-    // Channel must start with # or &
+    if (channel.length() < 2) {
+        return false;
+    }
+
     if (channel[0] != '#' && channel[0] != '&') {
         return false;
     }
 
-    // Rest can be any printable character except space, comma, or control chars
     for (size_t i = 1; i < channel.length(); ++i) {
-        if (channel[i] <= 32  || channel[i] == ',' || channel[i] == 127) {
+        if (channel[i] <= 32 || channel[i] == ',' || channel[i] == 127) {
             return false;
         }
     }
