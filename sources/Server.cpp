@@ -10,6 +10,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <iostream>
+#include <ctime>
+#include <sstream>
 
 Server::Server(const std::string& port, const std::string& password)
     : _serverSocket(-1),
@@ -297,6 +299,11 @@ void Server::flushClientOutput(int clientFd)
 
 
 void Server::runPollLoop() {
+    // FIX: Server-initiated PING to detect dead clients
+    // Check every poll cycle for clients idle > 120 seconds
+    const time_t PING_INTERVAL = 120;
+    const time_t PONG_TIMEOUT = 60;
+
     while (_running)
     {
         for (size_t i = 0; i < _pollFds.size(); ++i)
@@ -314,13 +321,36 @@ void Server::runPollLoop() {
                 _pollFds[i].events |= POLLOUT;
         }
 
-        int pollResult = poll(&_pollFds[0], _pollFds.size(), -1);
+        // FIX: Use 5-second timeout instead of infinite to allow periodic PING checks
+        int pollResult = poll(&_pollFds[0], _pollFds.size(), 5000);
 
         if (pollResult == -1) {
             if (errno == EINTR) {
                 continue;
             }
             break;
+        }
+
+        // FIX: Server-initiated PING: check for idle clients
+        time_t now = std::time(NULL);
+        std::vector<int> timedOutFds;
+        std::map<int, Client*>::iterator it = _clients.begin();
+        while (it != _clients.end()) {
+            Client* c = it->second;
+            time_t idle = now - c->getLastActivity();
+            if (idle > PING_INTERVAL + PONG_TIMEOUT) {
+                // Client exceeded PONG timeout, disconnect
+                timedOutFds.push_back(it->first);
+            } else if (idle > PING_INTERVAL) {
+                // Send PING to idle client (they must respond with PONG)
+                std::ostringstream oss;
+                oss << c->getFd();
+                c->sendToClient(":" + _hostname + " PING :" + oss.str());
+            }
+            ++it;
+        }
+        for (size_t t = 0; t < timedOutFds.size(); ++t) {
+            handleClientDisconnect(timedOutFds[t]);
         }
 
         size_t i = 0;
@@ -385,6 +415,7 @@ void Server::handleClientData(int clientFd)
 
     Client* client = getClientByFd(clientFd);
     if (client) {
+        client->updateLastActivity();
         client->appendRecvBuffer(buffer);
 
         while (client->hasCompleteMessage())

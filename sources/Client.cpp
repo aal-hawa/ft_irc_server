@@ -9,7 +9,8 @@ Client::Client(int fd, const std::string& hostname)
       _hostname(hostname),
       _isRegistered(false),
       _isOperator(false),
-      _isAuthenticated(false) {
+      _isAuthenticated(false),
+      _lastActivity(std::time(NULL)) {
 }
 
 Client::~Client() {
@@ -129,4 +130,12 @@ std::string& Client::frontSendBuffer() {
 
 void Client::popFrontSendBuffer() {
     _sendBuffer.pop_front();
+}
+
+void Client::updateLastActivity() {
+    _lastActivity = std::time(NULL);
+}
+
+time_t Client::getLastActivity() const {
+    return _lastActivity;
 }

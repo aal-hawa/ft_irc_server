@@ -3,6 +3,13 @@
 
 Channel::Channel(const std::string& name, Client* founder)
     : _name(name),
+      _topic(""),
+      _key(""),
+      _topicSetter(""),
+      _topicSetTime(0),
+      _members(),
+      _operators(),
+      _invited(),
       _inviteOnly(false),
       _topicRestricted(false),
       _userLimit(0) {
@@ -50,8 +57,18 @@ const std::map<int, Client*>& Channel::getMembers() const {
     return _members;
 }
 
-void Channel::setTopic(const std::string& topic) {
+std::string Channel::getTopicSetter() const {
+    return _topicSetter;
+}
+
+time_t Channel::getTopicSetTime() const {
+    return _topicSetTime;
+}
+
+void Channel::setTopic(const std::string& topic, const std::string& setter) {
     _topic = topic;
+    _topicSetter = setter;
+    _topicSetTime = std::time(NULL);
 }
 
 void Channel::setKey(const std::string& key) {

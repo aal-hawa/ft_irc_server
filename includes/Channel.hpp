@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <set>
+#include <ctime>
 
 class Client;
 
@@ -13,6 +14,8 @@ private:
     std::string _name;
     std::string _topic;
     std::string _key;
+    std::string _topicSetter;
+    time_t _topicSetTime;
     std::map<int, Client*> _members;
     std::set<int> _operators;
     std::set<int> _invited;
@@ -28,6 +31,8 @@ public:
     std::string getName() const;
     std::string getTopic() const;
     std::string getKey() const;
+    std::string getTopicSetter() const;
+    time_t getTopicSetTime() const;
     bool isInviteOnly() const;
     bool isTopicRestricted() const;
     unsigned int getUserLimit() const;
@@ -35,7 +40,7 @@ public:
     const std::map<int, Client*>& getMembers() const;
 
     // Setters
-    void setTopic(const std::string& topic);
+    void setTopic(const std::string& topic, const std::string& setter);
     void setKey(const std::string& key);
     void setInviteOnly(bool inviteOnly);
     void setTopicRestricted(bool restricted);

@@ -12,6 +12,7 @@ private:
     std::vector<std::string> _params;
     std::string _trailing;
     bool _complete;
+    bool _firstParamTrailing;
 
 public:
     Message(const std::string& raw);
@@ -23,10 +24,12 @@ public:
     std::string getCommand() const;
     std::vector<std::string> getParams() const;
     std::string getTrailing() const;
+    bool firstParamWasTrailing() const;
 
 private:
     void extractPrefix();
     void extractCommandAndParams();
+    size_t paramCount() const;
 };
 
 #endif

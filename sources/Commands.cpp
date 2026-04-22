@@ -92,6 +92,20 @@ void Command_NICK(Server* server, Client* client, const Message& message)
         return;
     }
 
+    // FIX: Reject if first param came from trailing (was prefixed with ':')
+    // e.g. "NICK :bad" -> parser strips ':' -> "bad" looks valid, but original started with ':'
+    if (message.firstParamWasTrailing()) {
+        client->sendToClient(":" + server->getHostname() + " 432 " + nickOrStar(client) + " :* :Erroneous nickname");
+        return;
+    }
+
+    // FIX: Reject if there are extra parameters (e.g. "NICK bad nick" has a space in raw input)
+    // A valid NICK command should have exactly 1 parameter (the nickname)
+    if (params.size() > 1 && message.getTrailing().empty()) {
+        client->sendToClient(":" + server->getHostname() + " 432 " + nickOrStar(client) + " " + params[0] + " :Erroneous nickname");
+        return;
+    }
+
     std::string newNick = params[0];
 
     if (!Utils::isValidNickname(newNick)) {
@@ -217,6 +231,14 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
         if (!channel->getTopic().empty()) {
             client->sendToClient(":" + server->getHostname() + " 332 " +
                 client->getNickname() + " " + channelName + " :" + channel->getTopic());
+            // FIX: Send RPL_TOPICWHOTIME (333) alongside RPL_TOPIC (332)
+            if (!channel->getTopicSetter().empty() && channel->getTopicSetTime() > 0) {
+                std::ostringstream oss333;
+                oss333 << channel->getTopicSetTime();
+                client->sendToClient(":" + server->getHostname() + " 333 " +
+                    client->getNickname() + " " + channelName + " " +
+                    channel->getTopicSetter() + " " + oss333.str());
+            }
         } else {
             client->sendToClient(":" + server->getHostname() + " 331 " +
                 client->getNickname() + " " + channelName + " :No topic is set");
@@ -501,6 +523,14 @@ void Command_TOPIC(Server* server, Client* client, const Message& message)
             client->sendToClient(":" + server->getHostname() + " 331 " + client->getNickname() + " " + channelName + " :No topic is set");
         } else {
             client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
+            // FIX: Send RPL_TOPICWHOTIME (333) alongside RPL_TOPIC (332)
+            if (!channel->getTopicSetter().empty() && channel->getTopicSetTime() > 0) {
+                std::ostringstream oss333;
+                oss333 << channel->getTopicSetTime();
+                client->sendToClient(":" + server->getHostname() + " 333 " +
+                    client->getNickname() + " " + channelName + " " +
+                    channel->getTopicSetter() + " " + oss333.str());
+            }
         }
         return;
     }
@@ -511,7 +541,7 @@ void Command_TOPIC(Server* server, Client* client, const Message& message)
     }
 
     std::string newTopic = params[1];
-    channel->setTopic(newTopic);
+    channel->setTopic(newTopic, client->getNickname());
     server->broadcastToChannel(channel, ":" + client->getPrefix() + " TOPIC " + channelName + " :" + newTopic, NULL);
 }
 
@@ -641,6 +671,9 @@ void Command_MODE(Server* server, Client* client, const Message& message)
                     channel->removeOperator(targetClient);
                 }
                 server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
+            } else {
+                // FIX: Return ERR_UNKNOWNMODE (472) for unrecognized mode characters
+                client->sendToClient(":" + server->getHostname() + " 472 " + client->getNickname() + " " + std::string(1, c) + " :is unknown mode char to me");
             }
         }
     } else {

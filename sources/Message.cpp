@@ -1,6 +1,6 @@
 #include "../includes/Message.hpp"
 
-Message::Message(const std::string& raw) : _raw(raw), _complete(true)
+Message::Message(const std::string& raw) : _raw(raw), _complete(true), _firstParamTrailing(false)
 {
     if (_raw.find("\r\n") == std::string::npos)
     {
@@ -37,6 +37,14 @@ std::vector<std::string> Message::getParams() const {
 
 std::string Message::getTrailing() const {
     return _trailing;
+}
+
+bool Message::firstParamWasTrailing() const {
+    return _firstParamTrailing;
+}
+
+size_t Message::paramCount() const {
+    return _params.size();
 }
 
 void Message::extractPrefix() {
@@ -91,6 +99,8 @@ void Message::extractCommandAndParams()
         if (_raw[0] == ':') {
             _trailing = _raw.substr(1);
             _params.push_back(_trailing);
+            if (_params.size() == 1)
+                _firstParamTrailing = true;
             break;
         }
 

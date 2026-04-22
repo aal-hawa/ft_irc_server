@@ -4,6 +4,7 @@
 // #include "Server.hpp"
 #include <string>
 #include <deque>
+#include <ctime>
 
 #include <unistd.h>
 #include <cstring>
@@ -22,6 +23,7 @@ private:
     bool _isRegistered;
     bool _isOperator;
     bool _isAuthenticated;
+    time_t _lastActivity;
     // Server* _server;
 
 public:
@@ -57,6 +59,10 @@ public:
     bool hasPendingOutput() const;
     std::string& frontSendBuffer();
     void popFrontSendBuffer();
+
+    // Activity tracking for server PING
+    void updateLastActivity();
+    time_t getLastActivity() const;
 };
 
 #endif
