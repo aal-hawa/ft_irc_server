@@ -7,7 +7,6 @@ Message::Message(const std::string& raw) : _raw(raw), _complete(true), _firstPar
         _complete = false;
     }
     else {
-        // Remove \r\n from the end
         size_t crlfPos = _raw.find("\r\n");
         _raw = _raw.substr(0, crlfPos);
         parse();

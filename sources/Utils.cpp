@@ -13,7 +13,6 @@ bool Utils::isValidNickname(const std::string& nickname) {
         return false;
     }
 
-    // First character must be letter or special chars: [ \ ] ^ _ `
     if (!isalpha(nickname[0]) &&
         nickname[0] != '[' && nickname[0] != ']' &&
         nickname[0] != '\\' && nickname[0] != '^' &&
@@ -21,7 +20,6 @@ bool Utils::isValidNickname(const std::string& nickname) {
         return false;
     }
 
-    // Rest can be letter, digit, or special chars: - [ \ ] ^ _ `
     for (size_t i = 1; i < nickname.length(); ++i) {
         if (!isalnum(nickname[i]) &&
             nickname[i] != '-' && nickname[i] != '[' &&
@@ -40,7 +38,6 @@ bool Utils::isValidUsername(const std::string& username) {
         return false;
     }
 
-    // Username can contain letters, digits, and hyphens
     for (size_t i = 0; i < username.length(); ++i) {
         if (!isalnum(username[i]) && username[i] != '-') {
             return false;
@@ -111,13 +108,11 @@ std::string Utils::toUpper(const std::string& str) {
 }
 
 void Utils::trim(std::string& str) {
-    // Trim leading whitespace
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start != std::string::npos) {
         str = str.substr(start);
     }
 
-    // Trim trailing whitespace
     size_t end = str.find_last_not_of(" \t\r\n");
     if (end != std::string::npos) {
         str = str.substr(0, end + 1);
@@ -160,6 +155,6 @@ std::string Utils::getCurrentTime() {
     time_t now = time(0);
     char* dt = ctime(&now);
     std::string timeStr(dt);
-    timeStr.erase(timeStr.length() - 1); // Remove newline
+    timeStr.erase(timeStr.length() - 1);
     return timeStr;
 }

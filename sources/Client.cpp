@@ -1,14 +1,11 @@
 #include "../includes/Client.hpp"
 #include <iostream>
-// #include "../includes/Server.hpp"
 
 
-// Client::Client(int fd, const std::string& hostname, Server* server)
 Client::Client(int fd, const std::string& hostname)
     : _fd(fd),
       _hostname(hostname),
       _isRegistered(false),
-      _isOperator(false),
       _isAuthenticated(false),
       _lastActivity(std::time(NULL)) {
 }
@@ -43,9 +40,7 @@ bool Client::isRegistered() const {
     return _isRegistered;
 }
 
-bool Client::isOperator() const {
-    return _isOperator;
-}
+
 
 bool Client::isAuthenticated() const {
     return _isAuthenticated;
@@ -73,9 +68,7 @@ void Client::setRegistered(bool registered) {
     _isRegistered = registered;
 }
 
-void Client::setOperator(bool isOp) {
-    _isOperator = isOp;
-}
+
 
 void Client::setAuthenticated(bool auth) {
     _isAuthenticated = auth;
@@ -94,7 +87,6 @@ bool Client::hasCompleteMessage() const {
         || (_recvBuffer.find("\n") != std::string::npos);
 }
 
-// FIXED: Support both \r\n (telnet) and \n (nc)
 std::string Client::getNextMessage()
 {
     size_t pos = _recvBuffer.find("\r\n");
@@ -112,11 +104,9 @@ std::string Client::getNextMessage()
     std::string msg = _recvBuffer.substr(0, pos);
    _recvBuffer.erase(0, pos + delimLen);
 
-    //remove trailing 'r' if delimiter was '\n'
     if (!msg.empty() && msg[msg.size() - 1] == '\r')
         msg.erase(msg.size() -1);
     
-    // IMPORTant: NORMALIZE TO IRC LINE ENDING FOR MESSAGE PARSER
     return msg + "\r\n";
 }
 

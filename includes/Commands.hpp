@@ -9,7 +9,6 @@ class Server;
 class Client;
 class Message;
 
-// Command functions
 void Command_PASS(Server* server, Client* client, const Message& message);
 void Command_NICK(Server* server, Client* client, const Message& message);
 void Command_USER(Server* server, Client* client, const Message& message);

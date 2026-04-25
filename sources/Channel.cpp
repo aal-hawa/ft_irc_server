@@ -1,7 +1,7 @@
 #include "../includes/Channel.hpp"
 #include "../includes/Client.hpp"
 
-Channel::Channel(const std::string& name, Client* founder)
+Channel::Channel(const std::string& name)
     : _name(name),
       _topic(""),
       _key(""),
@@ -12,12 +12,7 @@ Channel::Channel(const std::string& name, Client* founder)
       _invited(),
       _inviteOnly(false),
       _topicRestricted(false),
-      _userLimit(0) {
-    // FIX: Do NOT add founder as member/operator here.
-    // Command_JOIN handles addMember/addOperator/uninviteUser uniformly
-    // for both new and existing channels. Adding here caused double-add.
-    (void)founder;
-}
+      _userLimit(0) {}
 
 Channel::~Channel() {
     _members.clear();

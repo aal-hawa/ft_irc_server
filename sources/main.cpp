@@ -22,7 +22,6 @@ int main(int argc, char* argv[]) {
     std::string port = argv[1];
     std::string password = argv[2];
 
-    // Set up signal handler
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     signal(SIGPIPE, SIG_IGN);

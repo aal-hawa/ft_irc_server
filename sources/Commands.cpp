@@ -6,7 +6,6 @@
 #include <sstream>
 #include <set>
 
-// Helper: returns the client's nickname, or "*" if not yet set
 static std::string nickOrStar(Client* client)
 {
     const std::string& nick = client->getNickname();
@@ -28,7 +27,6 @@ static void tryRegister(Server* server, Client* client)
     server->sendWelcome(client);
 }
 
-// PING
 void Command_PING(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -38,7 +36,6 @@ void Command_PING(Server* server, Client* client, const Message& message)
     client->sendToClient(":" + server->getHostname() + " PONG :" + token);
 }
 
-// PONG
 void Command_PONG(Server* server, Client* client, const Message& message)
 {
     (void)server;
@@ -46,7 +43,6 @@ void Command_PONG(Server* server, Client* client, const Message& message)
     (void)message;
 }
 
-// CAP
 void Command_CAP(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -58,7 +54,6 @@ void Command_CAP(Server* server, Client* client, const Message& message)
     }
 }
 
-// PASS Command
 void Command_PASS(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -82,7 +77,6 @@ void Command_PASS(Server* server, Client* client, const Message& message)
     }
 }
 
-// NICK Command
 void Command_NICK(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -92,15 +86,11 @@ void Command_NICK(Server* server, Client* client, const Message& message)
         return;
     }
 
-    // FIX: Reject if first param came from trailing (was prefixed with ':')
-    // e.g. "NICK :bad" -> parser strips ':' -> "bad" looks valid, but original started with ':'
     if (message.firstParamWasTrailing()) {
         client->sendToClient(":" + server->getHostname() + " 432 " + nickOrStar(client) + " :* :Erroneous nickname");
         return;
     }
 
-    // FIX: Reject if there are extra parameters (e.g. "NICK bad nick" has a space in raw input)
-    // A valid NICK command should have exactly 1 parameter (the nickname)
     if (params.size() > 1 && message.getTrailing().empty()) {
         client->sendToClient(":" + server->getHostname() + " 432 " + nickOrStar(client) + " " + params[0] + " :Erroneous nickname");
         return;
@@ -143,7 +133,6 @@ void Command_NICK(Server* server, Client* client, const Message& message)
     tryRegister(server, client);
 }
 
-// USER Command
 void Command_USER(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -169,7 +158,6 @@ void Command_USER(Server* server, Client* client, const Message& message)
     tryRegister(server, client);
 }
 
-// JOIN Command
 void Command_JOIN(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -196,7 +184,7 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
 
         Channel* channel = server->getChannel(channelName);
         if (!channel) {
-            channel = new Channel(channelName, client);
+            channel = new Channel(channelName);
             server->addChannel(channel);
         } else {
             if (channel->isMember(client)) {
@@ -231,8 +219,8 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
         if (!channel->getTopic().empty()) {
             client->sendToClient(":" + server->getHostname() + " 332 " +
                 client->getNickname() + " " + channelName + " :" + channel->getTopic());
-            // FIX: Send RPL_TOPICWHOTIME (333) alongside RPL_TOPIC (332)
-            if (!channel->getTopicSetter().empty() && channel->getTopicSetTime() > 0) {
+
+                if (!channel->getTopicSetter().empty() && channel->getTopicSetTime() > 0) {
                 std::ostringstream oss333;
                 oss333 << channel->getTopicSetTime();
                 client->sendToClient(":" + server->getHostname() + " 333 " +
@@ -249,7 +237,6 @@ void Command_JOIN(Server* server, Client* client, const Message& message)
     }
 }
 
-// PART Command
 void Command_PART(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -290,7 +277,6 @@ void Command_PART(Server* server, Client* client, const Message& message)
     }
 }
 
-// PRIVMSG Command
 void Command_PRIVMSG(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -339,13 +325,11 @@ void Command_PRIVMSG(Server* server, Client* client, const Message& message)
     }
 }
 
-// NOTICE Command - Like PRIVMSG but never sends error replies
 void Command_NOTICE(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
 
     if (params.empty() || params.size() < 2) {
-        // NOTICE MUST NOT send any error replies
         return;
     }
 
@@ -359,7 +343,6 @@ void Command_NOTICE(Server* server, Client* client, const Message& message)
     if (target[0] == '#' || target[0] == '&') {
         Channel* channel = server->getChannel(target);
         if (!channel || !channel->isMember(client)) {
-            // Silent failure - no error replies for NOTICE
             return;
         }
 
@@ -368,7 +351,6 @@ void Command_NOTICE(Server* server, Client* client, const Message& message)
     } else {
         Client* targetClient = server->getClientByNickname(target);
         if (!targetClient) {
-            // Silent failure - no error replies for NOTICE
             return;
         }
 
@@ -377,7 +359,6 @@ void Command_NOTICE(Server* server, Client* client, const Message& message)
     }
 }
 
-// QUIT Command
 void Command_QUIT(Server* server, Client* client, const Message& message)
 {
     std::string reason;
@@ -390,7 +371,6 @@ void Command_QUIT(Server* server, Client* client, const Message& message)
 
     std::string quitMsg = ":" + client->getPrefix() + " QUIT :" + reason;
 
-    // Remove from all channels
     std::vector<Channel*> channels = server->getChannelsByClient(client);
     for (size_t i = 0; i < channels.size(); ++i) {
         server->broadcastToChannel(channels[i], quitMsg, client);
@@ -401,11 +381,9 @@ void Command_QUIT(Server* server, Client* client, const Message& message)
         }
     }
 
-    // Remove from server
     server->removeClient(client->getFd());
 }
 
-// KICK Command
 void Command_KICK(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -446,7 +424,6 @@ void Command_KICK(Server* server, Client* client, const Message& message)
     }
 }
 
-// INVITE Command
 void Command_INVITE(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -470,8 +447,6 @@ void Command_INVITE(Server* server, Client* client, const Message& message)
         return;
     }
 
-    // FIX: Only require operator if channel is +i (invite-only)
-    // Per RFC 2812: on non-invite-only channels, any member can invite
     if (channel->isInviteOnly() && !channel->isOperator(client))
     {
         client->sendToClient(":" + server->getHostname() + " 482 " + nickOrStar(client) + " " + channelName + " :You're not channel operator");
@@ -495,7 +470,6 @@ void Command_INVITE(Server* server, Client* client, const Message& message)
     targetClient->sendToClient(":" + client->getPrefix() + " INVITE " + nickname + " :" + channelName);
 }
 
-// TOPIC Command
 void Command_TOPIC(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -523,7 +497,6 @@ void Command_TOPIC(Server* server, Client* client, const Message& message)
             client->sendToClient(":" + server->getHostname() + " 331 " + client->getNickname() + " " + channelName + " :No topic is set");
         } else {
             client->sendToClient(":" + server->getHostname() + " 332 " + client->getNickname() + " " + channelName + " :" + channel->getTopic());
-            // FIX: Send RPL_TOPICWHOTIME (333) alongside RPL_TOPIC (332)
             if (!channel->getTopicSetter().empty() && channel->getTopicSetTime() > 0) {
                 std::ostringstream oss333;
                 oss333 << channel->getTopicSetTime();
@@ -545,7 +518,6 @@ void Command_TOPIC(Server* server, Client* client, const Message& message)
     server->broadcastToChannel(channel, ":" + client->getPrefix() + " TOPIC " + channelName + " :" + newTopic, NULL);
 }
 
-// MODE Command
 void Command_MODE(Server* server, Client* client, const Message& message)
 {
     std::vector<std::string> params = message.getParams();
@@ -557,7 +529,6 @@ void Command_MODE(Server* server, Client* client, const Message& message)
 
     std::string target = params[0];
 
-    // Channel mode
     if (target[0] == '#' || target[0] == '&') {
         Channel* channel = server->getChannel(target);
         if (!channel) {
@@ -591,7 +562,6 @@ void Command_MODE(Server* server, Client* client, const Message& message)
             return;
         }
 
-        // Change modes
         if (!channel->isOperator(client)) {
             client->sendToClient(":" + server->getHostname() + " 482 " + nickOrStar(client) + " " + target + " :You're not channel operator");
             return;
@@ -672,12 +642,10 @@ void Command_MODE(Server* server, Client* client, const Message& message)
                 }
                 server->broadcastToChannel(channel, ":" + client->getPrefix() + " MODE " + target + " " + (adding ? "+" : "-") + "o " + targetClient->getNickname(), NULL);
             } else {
-                // FIX: Return ERR_UNKNOWNMODE (472) for unrecognized mode characters
                 client->sendToClient(":" + server->getHostname() + " 472 " + client->getNickname() + " " + std::string(1, c) + " :is unknown mode char to me");
             }
         }
     } else {
-        // User mode query/change
         if (target != client->getNickname()) {
             client->sendToClient(":" + server->getHostname() + " 502 " +
                 client->getNickname() + " :Cannot change mode for other users");

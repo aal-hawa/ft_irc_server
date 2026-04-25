@@ -1,7 +1,6 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-// #include "Server.hpp"
 #include <string>
 #include <deque>
 #include <ctime>
@@ -9,7 +8,6 @@
 #include <unistd.h>
 #include <cstring>
 
-// class Server;
 
 class Client {
 private:
@@ -21,46 +19,37 @@ private:
     std::string _recvBuffer;
     std::deque<std::string> _sendBuffer;
     bool _isRegistered;
-    bool _isOperator;
     bool _isAuthenticated;
     time_t _lastActivity;
-    // Server* _server;
 
 public:
-    // Client(int fd, const std::string& hostname, Server* server);
     Client(int fd, const std::string& hostname);
     ~Client();
 
-    // Getters
     int getFd() const;
     std::string getNickname() const;
     std::string getUsername() const;
     std::string getHostname() const;
     std::string getRealname() const;
     bool isRegistered() const;
-    bool isOperator() const;
     bool isAuthenticated() const;
     std::string getPrefix() const;
 
-    // Setters
     void setNickname(const std::string& nick);
     void setUsername(const std::string& username);
     void setRealname(const std::string& realname);
     void setRegistered(bool registered);
-    void setOperator(bool isOp);
     void setAuthenticated(bool auth);
 
-    // Message handling
     void sendToClient(const std::string& message);
     void appendRecvBuffer(const std::string& data);
     bool hasCompleteMessage() const;
     std::string getNextMessage();
-    //output queue helpers 
+
     bool hasPendingOutput() const;
     std::string& frontSendBuffer();
     void popFrontSendBuffer();
 
-    // Activity tracking for server PING
     void updateLastActivity();
     time_t getLastActivity() const;
 };

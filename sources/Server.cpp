@@ -32,19 +32,16 @@ Server::Server(const std::string& port, const std::string& password)
 Server::~Server() {
     stop();
 
-    // Close all client connections
     for (std::map<int, Client*>::iterator it = _clients.begin(); it != _clients.end(); ++it) {
         delete it->second;
     }
     _clients.clear();
 
-    // Delete all channels
     for (std::vector<Channel*>::iterator it = _channels.begin(); it != _channels.end(); ++it) {
         delete *it;
     }
     _channels.clear();
 
-    // Close server socket
     if (_serverSocket != -1) {
         close(_serverSocket);
     }
@@ -79,7 +76,6 @@ void Server::addClient(Client* client) {
 }
 
 void Server::removeClient(int fd) {
-    // Remove from poll fds
     for (size_t i = 0; i < _pollFds.size(); ++i) {
         if (_pollFds[i].fd == fd) {
             _pollFds.erase(_pollFds.begin() + i);
@@ -87,7 +83,6 @@ void Server::removeClient(int fd) {
         }
     }
 
-    // Remove from clients map
     std::map<int, Client*>::iterator it = _clients.find(fd);
     if (it != _clients.end()) {
         delete it->second;
@@ -160,8 +155,6 @@ void Server::sendWelcome(Client* client) {
     client->sendToClient(":" + _hostname + " 001 " + client->getNickname() + " :Welcome to the Internet Relay Network " + client->getPrefix());
     client->sendToClient(":" + _hostname + " 002 " + client->getNickname() + " :Your host is " + _hostname + ", running version ft_irc");
     client->sendToClient(":" + _hostname + " 003 " + client->getNickname() + " :This server was created " + _creationTime);
-    // FIX: 004 RPL_MYINFO format is: servername version user_modes channel_modes
-    // 'i', 'k', 'o', 't', 'l' are all CHANNEL modes, not user modes
     client->sendToClient(":" + _hostname + " 004 " + client->getNickname() + " " + _hostname + " ft_irc * ikotl");
 }
 
@@ -243,13 +236,7 @@ void Server::acceptNewConnection() {
 
     int clientFd = accept(_serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
     if (clientFd == -1)
-    {
-        if (errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            // Error accepting connection
-        }
         return;
-    }
     setNonBlocking(clientFd);
 
     std::string hostname = inet_ntoa(clientAddr.sin_addr);
@@ -272,23 +259,18 @@ void Server::flushClientOutput(int clientFd)
         if (sent < 0)
         {
             if (errno == EAGAIN || errno == EWOULDBLOCK)
-            {
-                // Not ready to write, waiting for poll()
                 return;
-            }
             handleClientDisconnect(clientFd);
             return;
         }
 
         if (sent == 0)
         {
-            // Treat as disconnect
             handleClientDisconnect(clientFd);
             return;
         }
         if ((size_t) sent < msg.size())
         {
-            // Partial send: remove sent part, keep the rest for later
             msg.erase(0, sent);
             return;
         }
@@ -299,8 +281,6 @@ void Server::flushClientOutput(int clientFd)
 
 
 void Server::runPollLoop() {
-    // FIX: Server-initiated PING to detect dead clients
-    // Check every poll cycle for clients idle > 120 seconds
     const time_t PING_INTERVAL = 120;
     const time_t PONG_TIMEOUT = 60;
 
@@ -321,7 +301,6 @@ void Server::runPollLoop() {
                 _pollFds[i].events |= POLLOUT;
         }
 
-        // FIX: Use 5-second timeout instead of infinite to allow periodic PING checks
         int pollResult = poll(&_pollFds[0], _pollFds.size(), 5000);
 
         if (pollResult == -1) {
@@ -331,7 +310,6 @@ void Server::runPollLoop() {
             break;
         }
 
-        // FIX: Server-initiated PING: check for idle clients
         time_t now = std::time(NULL);
         std::vector<int> timedOutFds;
         std::map<int, Client*>::iterator it = _clients.begin();
@@ -339,10 +317,8 @@ void Server::runPollLoop() {
             Client* c = it->second;
             time_t idle = now - c->getLastActivity();
             if (idle > PING_INTERVAL + PONG_TIMEOUT) {
-                // Client exceeded PONG timeout, disconnect
                 timedOutFds.push_back(it->first);
             } else if (idle > PING_INTERVAL) {
-                // Send PING to idle client (they must respond with PONG)
                 std::ostringstream oss;
                 oss << c->getFd();
                 c->sendToClient(":" + _hostname + " PING :" + oss.str());
@@ -359,7 +335,6 @@ void Server::runPollLoop() {
             short re = _pollFds[i].revents;
             int fd = _pollFds[i].fd;
 
-            // broken/disconnected socket
             if (re & (POLLHUP | POLLERR | POLLNVAL))
             {
                 if (fd != _serverSocket)
@@ -370,7 +345,6 @@ void Server::runPollLoop() {
                 continue;
             }
 
-            // readable
             if (re & POLLIN)
             {
                 if (fd == _serverSocket)
@@ -379,11 +353,9 @@ void Server::runPollLoop() {
                     handleClientData(fd);
             }
 
-            // if client was removed during read handling, do not use fd again
             if (fd != _serverSocket && getClientByFd(fd) == NULL)
                 continue;
 
-            // writable
             if (re & POLLOUT)
                 flushClientOutput(fd);
 

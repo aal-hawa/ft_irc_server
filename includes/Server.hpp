@@ -34,31 +34,25 @@ public:
     void run();
     void stop();
 
-    // Getters
     std::string getPort() const;
     std::string getPassword() const;
     std::string getHostname() const;
 
-    // Client management
     void addClient(Client* client);
     void removeClient(int fd);
     Client* getClientByFd(int fd) const;
     Client* getClientByNickname(const std::string& nickname) const;
 
-    // Channel management
     void addChannel(Channel* channel);
     void removeChannel(Channel* channel);
     Channel* getChannel(const std::string& name) const;
     std::vector<Channel*> getChannelsByClient(Client* client) const;
 
-    // Message broadcasting
     void broadcastToChannel(Channel* channel, const std::string& message, Client* exclude);
 
-    // Welcome message
     void sendWelcome(Client* client);
     void sendNames(Client* client, Channel* channel);
 
-    // output Queue handling
     void flushClientOutput(int clientFd);
 
 private:
