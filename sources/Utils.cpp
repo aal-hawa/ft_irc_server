@@ -4,9 +4,6 @@
 #include <cctype>
 #include <climits>
 
-bool Utils::isValidPassword(const std::string& password) {
-    return !password.empty();
-}
 
 bool Utils::isValidNickname(const std::string& nickname) {
     if (nickname.empty() || nickname.length() > 9) {
@@ -107,17 +104,6 @@ std::string Utils::toUpper(const std::string& str) {
     return result;
 }
 
-void Utils::trim(std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start != std::string::npos) {
-        str = str.substr(start);
-    }
-
-    size_t end = str.find_last_not_of(" \t\r\n");
-    if (end != std::string::npos) {
-        str = str.substr(0, end + 1);
-    }
-}
 
 int Utils::atoi(const std::string& str)
 {

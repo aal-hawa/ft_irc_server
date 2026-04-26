@@ -56,9 +56,6 @@ void Server::stop() {
     _running = false;
 }
 
-std::string Server::getPort() const {
-    return _port;
-}
 
 std::string Server::getPassword() const {
     return _password;

@@ -34,7 +34,6 @@ public:
     void run();
     void stop();
 
-    std::string getPort() const;
     std::string getPassword() const;
     std::string getHostname() const;
 
