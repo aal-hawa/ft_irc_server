@@ -7,12 +7,15 @@ Client::Client(int fd, const std::string& hostname)
       _hostname(hostname),
       _isRegistered(false),
       _isAuthenticated(false),
-      _lastActivity(std::time(NULL)) {
+      _lastActivity(std::time(NULL)),
+      _waitingPong(false),
+      _lastPingTime(0) {
 }
 
 Client::~Client() {
     if (_fd != -1) {
         close(_fd);
+        _fd = -1;
     }
 }
 
@@ -128,4 +131,20 @@ void Client::updateLastActivity() {
 
 time_t Client::getLastActivity() const {
     return _lastActivity;
+}
+
+bool Client::isWaitingPong() const {
+    return _waitingPong;
+}
+
+void Client::setWaitingPong(bool value) {
+    _waitingPong = value;
+}
+
+time_t Client::getLastPingTime() const {
+    return _lastPingTime;
+}
+
+void Client::setLastPingTime(time_t timeValue) {
+    _lastPingTime = timeValue;
 }

@@ -22,6 +22,9 @@ private:
     bool _isAuthenticated;
     time_t _lastActivity;
 
+    bool _waitingPong;
+    time_t _lastPingTime;
+
 public:
     Client(int fd, const std::string& hostname);
     ~Client();
@@ -52,6 +55,12 @@ public:
 
     void updateLastActivity();
     time_t getLastActivity() const;
+
+    bool isWaitingPong() const;
+    void setWaitingPong(bool value);
+
+    time_t getLastPingTime() const;
+    void setLastPingTime(time_t timeValue);
 };
 
 #endif

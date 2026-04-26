@@ -313,13 +313,31 @@ void Server::runPollLoop() {
         while (it != _clients.end()) {
             Client* c = it->second;
             time_t idle = now - c->getLastActivity();
-            if (idle > PING_INTERVAL + PONG_TIMEOUT) {
-                timedOutFds.push_back(it->first);
-            } else if (idle > PING_INTERVAL) {
-                std::ostringstream oss;
-                oss << c->getFd();
-                c->sendToClient(":" + _hostname + " PING :" + oss.str());
+            // if (idle > PING_INTERVAL + PONG_TIMEOUT) {
+            //     timedOutFds.push_back(it->first);
+            // } else if (idle > PING_INTERVAL) {
+            //     std::ostringstream oss;
+            //     oss << c->getFd();
+            //     c->sendToClient(":" + _hostname + " PING :" + oss.str());
+            // }
+
+            if (!c->isWaitingPong())
+            {
+                if (idle > PING_INTERVAL)
+                {
+                    std::ostringstream oss;
+                    oss << c->getFd();
+                    c->sendToClient(":" + _hostname + " PING :" + oss.str());
+                    c->setWaitingPong(true);
+                    c->setLastPingTime(now);
+                }
             }
+            else
+            {
+                if (now - c->getLastPingTime() > PONG_TIMEOUT)
+                    timedOutFds.push_back(it->first);
+            }
+
             ++it;
         }
         for (size_t t = 0; t < timedOutFds.size(); ++t) {
