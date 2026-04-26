@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstring>
-#include <errno.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <iostream>
@@ -255,8 +254,6 @@ void Server::flushClientOutput(int clientFd)
 
         if (sent < 0)
         {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                return;
             handleClientDisconnect(clientFd);
             return;
         }
@@ -301,9 +298,6 @@ void Server::runPollLoop() {
         int pollResult = poll(&_pollFds[0], _pollFds.size(), 5000);
 
         if (pollResult == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
             break;
         }
 
@@ -313,14 +307,6 @@ void Server::runPollLoop() {
         while (it != _clients.end()) {
             Client* c = it->second;
             time_t idle = now - c->getLastActivity();
-            // if (idle > PING_INTERVAL + PONG_TIMEOUT) {
-            //     timedOutFds.push_back(it->first);
-            // } else if (idle > PING_INTERVAL) {
-            //     std::ostringstream oss;
-            //     oss << c->getFd();
-            //     c->sendToClient(":" + _hostname + " PING :" + oss.str());
-            // }
-
             if (!c->isWaitingPong())
             {
                 if (idle > PING_INTERVAL)
@@ -387,8 +373,6 @@ void Server::handleClientData(int clientFd)
 
     if (bytesRead < 0)
     {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return;
         handleClientDisconnect(clientFd);
         return;
     }
