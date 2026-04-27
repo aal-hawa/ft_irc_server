@@ -39,8 +39,10 @@ void Command_PING(Server* server, Client* client, const Message& message)
 void Command_PONG(Server* server, Client* client, const Message& message)
 {
     (void)server;
-    (void)client;
     (void)message;
+
+    client->setWaitingPong(false);
+    client->setLastPingTime(0);
 }
 
 void Command_CAP(Server* server, Client* client, const Message& message)
