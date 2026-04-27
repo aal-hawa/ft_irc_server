@@ -638,6 +638,9 @@ void Command_MODE(Server* server, Client* client, const Message& message)
                     continue;
                 }
                 if (adding) {
+                    if (channel->isOperator(targetClient)) {
+                        continue;
+                    }
                     channel->addOperator(targetClient);
                 } else {
                     channel->removeOperator(targetClient);
